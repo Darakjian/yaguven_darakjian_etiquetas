@@ -2,12 +2,12 @@
 <templates xml:space="preserve">
     <t t-name="yaguven_darakjian_etiquetas.PrintLabelButton">
         <button type="button"
-                class="btn btn-secondary o_stat_info"
+                class="btn btn-primary"
                 t-att-disabled="state.printing"
                 t-on-click="onClick">
             <i class="fa fa-print"/>
-            <span t-if="state.printing"> Imprimiendo...</span>
-            <span t-else="1"> Imprimir etiqueta</span>
+            <t t-if="state.printing"> Imprimiendo...</t>
+            <t t-else="1"> Imprimir etiqueta</t>
         </button>
     </t>
 </templates>

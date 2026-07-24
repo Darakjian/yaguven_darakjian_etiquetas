@@ -5,8 +5,10 @@
         <field name="model">product.product</field>
         <field name="inherit_id" ref="product.product_normal_form_view"/>
         <field name="arch" type="xml">
-            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
-                <widget name="print_jewelry_label" string="Imprimir etiqueta"/>
+            <xpath expr="//sheet[@name='product_form']" position="before">
+                <header>
+                    <widget name="print_jewelry_label" string="Imprimir etiqueta"/>
+                </header>
             </xpath>
         </field>
     </record>
