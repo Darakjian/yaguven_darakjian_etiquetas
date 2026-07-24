@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="yaguven_darakjian_etiquetas.PrintLabelButton">
+        <button type="button"
+                class="btn btn-secondary o_stat_info"
+                t-att-disabled="state.printing"
+                t-on-click="onClick">
+            <i class="fa fa-print"/>
+            <span t-if="state.printing"> Imprimiendo...</span>
+            <span t-else="1"> Imprimir etiqueta</span>
+        </button>
+    </t>
+</templates>
