@@ -35,13 +35,13 @@ LABEL_HEIGHT_DOTS = 114  # MEDIDO: getvar zpl.label_length + ~HS (0114)
 # derecha lleva SKU, descripcion y precio. El SKU va mas a la derecha que el
 # nombre para dejarle lugar al cierre, que antes se le encimaba.
 COL_A_X, COL_B_X = 10, 120
-COL_NAME_X, COL_SKU_X = 215, 245
+COL_NAME_X, COL_SKU_X = 205, 245
 
 # (alto, ancho) por bloque. En ^A0N,h,w el `w` es el ancho NOMINAL por caracter.
 FONT_A = (17, 13)
 FONT_B = (17, 13)
 FONT_SKU = (17, 13)
-FONT_NAME = (15, 10)
+FONT_NAME = (19, 11)  # la descripcion es lo que mas mira el vendedor
 FONT_PRICE = (24, 20)
 
 # La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
@@ -168,7 +168,7 @@ class ProductProduct(models.Model):
             name_x=COL_NAME_X,
             sku_y=FIRST_ROW_Y,
             name_y=FIRST_ROW_Y + 22,
-            price_y=FIRST_ROW_Y + 43,
+            price_y=FIRST_ROW_Y + 47,
             skuh=FONT_SKU[0], skuw=FONT_SKU[1],
             nh=FONT_NAME[0], nw=FONT_NAME[1],
             ph=FONT_PRICE[0], pw=FONT_PRICE[1],
