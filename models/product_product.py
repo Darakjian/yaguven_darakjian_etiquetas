@@ -34,26 +34,31 @@ LABEL_HEIGHT_DOTS = 113  # ~0.56in @ 203dpi (confirmado contra la impresora real
 # izquierda son DOS sub-columnas (ficha de la piedra | medidas y metal) y la
 # derecha lleva SKU, descripcion y precio. El SKU va mas a la derecha que el
 # nombre para dejarle lugar al cierre, que antes se le encimaba.
-COL_A_X, COL_B_X = 10, 110
-COL_NAME_X, COL_SKU_X = 205, 230
+COL_A_X, COL_B_X = 10, 120
+COL_NAME_X, COL_SKU_X = 215, 245
 
-# (alto, ancho) por bloque. En ^A0N,h,w el ancho es dots POR CARACTER: es lo
-# que determina cuantos caracteres entran antes de invadir la columna vecina.
-# Los anchos estan calculados contra el reparto de arriba para que los valores
-# reales entren enteros: "Lab Grown" (9) y "SI1-SI2" (7) en A, "Size 6.00" (9)
-# y "French Clip" (11, fila del cierre) en B, "$ 11,165.00" (11) en el precio.
-FONT_A = (16, 10)
-FONT_B = (16, 10)
-FONT_SKU = (16, 11)
-FONT_NAME = (14, 10)
-FONT_PRICE = (18, 16)
+# (alto, ancho) por bloque. En ^A0N,h,w el `w` es el ancho NOMINAL por caracter.
+FONT_A = (20, 14)
+FONT_B = (20, 14)
+FONT_SKU = (20, 14)
+FONT_NAME = (17, 11)
+FONT_PRICE = (26, 22)
+
+# La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
+# que el ancho nominal (una "i" mucho menos que una "W"). Medido contra el
+# render real de la etiqueta, el promedio ronda el 65% del nominal. Sin este
+# factor el recorte era conservador de mas y cortaba texto que si entraba.
+CHAR_W_RATIO = 0.65
+
+FIRST_ROW_Y = 3   # la 5a fila cae en y=91 y termina en 111, dentro de los 113
+ROW_STEP_Y = 22
 
 
 def _fit(text, x_from, x_to, char_w):
     """Recorta el texto a los caracteres que entran entre dos columnas."""
     if not text:
         return ""
-    return text[: max(0, (x_to - x_from) // char_w)]
+    return text[: max(0, int((x_to - x_from) / (char_w * CHAR_W_RATIO)))]
 
 
 class ProductProduct(models.Model):
@@ -127,7 +132,7 @@ class ProductProduct(models.Model):
 
         rows = "".join(
             "^FO{ax},{y}^A0N,{ah},{aw}^FD{a}^FS^FO{bx},{y}^A0N,{bh},{bw}^FD{b}^FS".format(
-                ax=COL_A_X, bx=COL_B_X, y=4 + 21 * i,
+                ax=COL_A_X, bx=COL_B_X, y=FIRST_ROW_Y + ROW_STEP_Y * i,
                 ah=FONT_A[0], aw=FONT_A[1], bh=FONT_B[0], bw=FONT_B[1],
                 a=col_a[i], b=col_b[i])
             for i in range(5)
@@ -136,13 +141,14 @@ class ProductProduct(models.Model):
         return (
             "^XA"
             "^PW{width}^LL{height}"
-            # Interlineado 21 dots arrancando en y=4: la 5a fila termina en 106,
-            # dentro de los 113 de alto. Con el paso anterior (22 desde y=8) la
-            # ultima linea caia en 114 y salia cortada por el borde.
+            # La columna derecha no comparte el paso de las filas de la
+            # izquierda: son tres bloques de altura distinta (SKU, descripcion
+            # y precio destacado), espaciados para que el precio quede alineado
+            # con la fila de la medida, como en la etiqueta fisica.
             "{rows}"
-            "^FO{sku_x},4^A0N,{skuh},{skuw}^FD{sku}^FS"
-            "^FO{name_x},25^A0N,{nh},{nw}^FD{name}^FS"
-            "^FO{name_x},46^A0N,{ph},{pw}^FD{price}^FS"
+            "^FO{sku_x},{sku_y}^A0N,{skuh},{skuw}^FD{sku}^FS"
+            "^FO{name_x},{name_y}^A0N,{nh},{nw}^FD{name}^FS"
+            "^FO{name_x},{price_y}^A0N,{ph},{pw}^FD{price}^FS"
             "^XZ"
         ).format(
             width=LABEL_WIDTH_DOTS,
@@ -150,6 +156,9 @@ class ProductProduct(models.Model):
             rows=rows,
             sku_x=COL_SKU_X,
             name_x=COL_NAME_X,
+            sku_y=FIRST_ROW_Y,
+            name_y=FIRST_ROW_Y + 24,
+            price_y=FIRST_ROW_Y + 47,
             skuh=FONT_SKU[0], skuw=FONT_SKU[1],
             nh=FONT_NAME[0], nw=FONT_NAME[1],
             ph=FONT_PRICE[0], pw=FONT_PRICE[1],
