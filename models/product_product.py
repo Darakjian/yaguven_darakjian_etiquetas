@@ -20,11 +20,26 @@ class ProductProduct(models.Model):
     _inherit = "product.product"
 
     def _get_attribute_map(self):
+        """Atributos de la pieza, combinando template y variante.
+
+        Los datos gemologicos (carat, clarity, color, origin, shape) estan
+        configurados como `no_variant`: Odoo los deja en la linea del template
+        y NUNCA los cuelga de `product_template_attribute_value_ids`. Leer solo
+        la variante devolvia la etiqueta sin la ficha de la piedra.
+
+        Del template se toman unicamente las lineas de UN solo valor: si tiene
+        varios (ej. Material = White/Rose/Yellow Gold) es un atributo que genera
+        variantes, y el valor que corresponde a esta pieza lo aporta la variante.
+        """
         self.ensure_one()
-        return {
-            ptav.attribute_id.name: ptav.name
-            for ptav in self.product_template_attribute_value_ids
-        }
+        vals = {}
+        for line in self.product_tmpl_id.attribute_line_ids:
+            if len(line.value_ids) == 1:
+                vals[line.attribute_id.name] = line.value_ids.name
+        # La variante manda: pisa al template donde tenga valor propio.
+        for ptav in self.product_template_attribute_value_ids:
+            vals[ptav.attribute_id.name] = ptav.name
+        return vals
 
     def _get_stone_specs(self, attr_map):
         for family in STONE_FAMILIES:
@@ -59,14 +74,17 @@ class ProductProduct(models.Model):
         return (
             "^XA"
             "^PW{width}^LL{height}"
-            "^FO10,8^A0N,18,18^FD{left1}^FS"
-            "^FO160,8^A0N,18,18^FD{sku}^FS"
-            "^FO10,30^A0N,18,18^FD{left2}^FS"
-            "^FO160,30^A0N,16,16^FD{name}^FS"
-            "^FO10,52^A0N,18,18^FD{left3}^FS"
-            "^FO160,52^A0N,20,20^FD{price}^FS"
-            "^FO10,74^A0N,18,18^FD{left4}^FS"
-            "^FO10,96^A0N,18,18^FD{left5}^FS"
+            # Interlineado 21 dots arrancando en y=4: la 5a fila termina en 106,
+            # dentro de los 113 de alto. Con el paso anterior (22 desde y=8) la
+            # ultima linea caia en 114 y salia cortada por el borde.
+            "^FO10,4^A0N,18,18^FD{left1}^FS"
+            "^FO160,4^A0N,18,18^FD{sku}^FS"
+            "^FO10,25^A0N,18,18^FD{left2}^FS"
+            "^FO160,25^A0N,16,16^FD{name}^FS"
+            "^FO10,46^A0N,18,18^FD{left3}^FS"
+            "^FO160,46^A0N,20,20^FD{price}^FS"
+            "^FO10,67^A0N,18,18^FD{left4}^FS"
+            "^FO10,88^A0N,18,18^FD{left5}^FS"
             "^XZ"
         ).format(
             width=LABEL_WIDTH_DOTS,
