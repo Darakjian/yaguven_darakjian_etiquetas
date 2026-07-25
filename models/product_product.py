@@ -43,7 +43,7 @@ COL_NAME_X, COL_SKU_X = 205, 245
 FONT_A = (17, 13)
 FONT_B = (17, 13)
 FONT_SKU = (17, 13)
-FONT_NAME = (19, 11)  # la descripcion es lo que mas mira el vendedor
+FONT_NAME = (22, 11)  # la descripcion es lo que mas mira el vendedor
 FONT_PRICE = (20, 17)  # achicado para hacerle lugar al logo
 
 # La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
@@ -174,8 +174,8 @@ class ProductProduct(models.Model):
             sku_x=COL_SKU_X,
             name_x=COL_NAME_X,
             sku_y=FIRST_ROW_Y,
-            name_y=FIRST_ROW_Y + 22,
-            price_y=FIRST_ROW_Y + 45,
+            name_y=FIRST_ROW_Y + 20,
+            price_y=FIRST_ROW_Y + 47,
             skuh=FONT_SKU[0], skuw=FONT_SKU[1],
             nh=FONT_NAME[0], nw=FONT_NAME[1],
             ph=FONT_PRICE[0], pw=FONT_PRICE[1],
