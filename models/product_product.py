@@ -12,8 +12,48 @@ STONE_FAMILIES = [
     "Emerald",
 ]
 
+# Cascadas de fallback: la primera que tenga valor es la que se imprime. Los
+# atributos son excluyentes por tipo de pieza (un anillo trae Ring Size, un
+# collar trae Length), por eso ninguno solo alcanza.
+MEASURE_ATTRS = ["Ring Size", "Length", "Drop Length", "Width", "Diameter",
+                 "Shank Width (M)", "Bracelet/Strap Length", "Gram Weight"]
+CLASP_ATTRS = ["Clasp", "Earring Back", "Case Back"]
+
+# El metal va abreviado, como en la etiqueta que ya usa la tienda ("YG").
+METAL_ABBR = {
+    "White Gold": "WG", "Yellow Gold": "YG", "Rose Gold": "RG",
+    "Pink Gold": "PG", "Two Tone": "2T", "Tri Color": "3T",
+    "Platinum": "PLT", "Palladium": "PD", "Titanium": "TI",
+    "Sterling Silver": "SS", "Silver": "SLV", "Stainless Steel": "STL",
+}
+
 LABEL_WIDTH_DOTS = 406   # 2in @ 203dpi (confirmado contra la impresora real)
 LABEL_HEIGHT_DOTS = 113  # ~0.56in @ 203dpi (confirmado contra la impresora real)
+
+# Columnas, replicando la etiqueta fisica que ya usa la tienda: la mitad
+# izquierda son DOS sub-columnas (ficha de la piedra | medidas y metal) y la
+# derecha lleva SKU, descripcion y precio. El SKU va mas a la derecha que el
+# nombre para dejarle lugar al cierre, que antes se le encimaba.
+COL_A_X, COL_B_X = 10, 110
+COL_NAME_X, COL_SKU_X = 205, 230
+
+# (alto, ancho) por bloque. En ^A0N,h,w el ancho es dots POR CARACTER: es lo
+# que determina cuantos caracteres entran antes de invadir la columna vecina.
+# Los anchos estan calculados contra el reparto de arriba para que los valores
+# reales entren enteros: "Lab Grown" (9) y "SI1-SI2" (7) en A, "Size 6.00" (9)
+# y "French Clip" (11, fila del cierre) en B, "$ 11,165.00" (11) en el precio.
+FONT_A = (16, 10)
+FONT_B = (16, 10)
+FONT_SKU = (16, 11)
+FONT_NAME = (14, 10)
+FONT_PRICE = (18, 16)
+
+
+def _fit(text, x_from, x_to, char_w):
+    """Recorta el texto a los caracteres que entran entre dos columnas."""
+    if not text:
+        return ""
+    return text[: max(0, (x_to - x_from) // char_w)]
 
 
 class ProductProduct(models.Model):
@@ -53,23 +93,45 @@ class ProductProduct(models.Model):
                 }
         return {}
 
+    def _first_of(self, attr_map, candidates):
+        """Primer atributo de la cascada que tenga valor cargado."""
+        for name in candidates:
+            if attr_map.get(name):
+                return attr_map[name]
+        return ""
+
     def get_jewelry_label_zpl(self):
         self.ensure_one()
         attr_map = self._get_attribute_map()
         specs = self._get_stone_specs(attr_map)
         karatage = attr_map.get("Karatage", "")
         metal = attr_map.get("Material") or attr_map.get("Primary Color", "")
+        metal = METAL_ABBR.get(metal, metal)
         origin = attr_map.get("Diamond Origin") or attr_map.get("Center Diamond Origin", "")
+        measure = self._first_of(attr_map, MEASURE_ATTRS)
+        clasp = self._first_of(attr_map, CLASP_ATTRS)
 
-        name = (self.name or "")[:28]
-        sku = self.default_code or ""
+        sku = _fit(self.default_code or "", COL_SKU_X, LABEL_WIDTH_DOTS, FONT_SKU[1])
+        name = _fit(self.name or "", COL_NAME_X, LABEL_WIDTH_DOTS, FONT_NAME[1])
         price = "$ {:,.2f}".format(self.lst_price)
 
-        left1 = specs.get("carat", "")
-        left2 = specs.get("clarity", "")
-        left3 = "{}   {}".format(specs.get("color", ""), specs.get("carat", "")).strip()
-        left4 = "{}   {}".format(specs.get("quantity", ""), karatage).strip()
-        left5 = "{} {}".format(origin, metal).strip()
+        # Columna A: ficha de la piedra. Columna B: cierre, medida, metal.
+        # Se recortan contra el inicio de la columna vecina para que nunca se
+        # encimen (el cierre montandose sobre el SKU era el defecto de origen).
+        col_a = [specs.get("carat", ""), specs.get("clarity", ""),
+                 specs.get("color", ""), specs.get("quantity", ""), origin]
+        col_b = [clasp, "", measure, karatage, metal]
+        col_a = [_fit(v, COL_A_X, COL_B_X, FONT_A[1]) for v in col_a]
+        col_b = [_fit(v, COL_B_X, COL_SKU_X - 4 if i == 0 else COL_NAME_X - 4, FONT_B[1])
+                 for i, v in enumerate(col_b)]
+
+        rows = "".join(
+            "^FO{ax},{y}^A0N,{ah},{aw}^FD{a}^FS^FO{bx},{y}^A0N,{bh},{bw}^FD{b}^FS".format(
+                ax=COL_A_X, bx=COL_B_X, y=4 + 21 * i,
+                ah=FONT_A[0], aw=FONT_A[1], bh=FONT_B[0], bw=FONT_B[1],
+                a=col_a[i], b=col_b[i])
+            for i in range(5)
+        )
 
         return (
             "^XA"
@@ -77,23 +139,20 @@ class ProductProduct(models.Model):
             # Interlineado 21 dots arrancando en y=4: la 5a fila termina en 106,
             # dentro de los 113 de alto. Con el paso anterior (22 desde y=8) la
             # ultima linea caia en 114 y salia cortada por el borde.
-            "^FO10,4^A0N,18,18^FD{left1}^FS"
-            "^FO160,4^A0N,18,18^FD{sku}^FS"
-            "^FO10,25^A0N,18,18^FD{left2}^FS"
-            "^FO160,25^A0N,16,16^FD{name}^FS"
-            "^FO10,46^A0N,18,18^FD{left3}^FS"
-            "^FO160,46^A0N,20,20^FD{price}^FS"
-            "^FO10,67^A0N,18,18^FD{left4}^FS"
-            "^FO10,88^A0N,18,18^FD{left5}^FS"
+            "{rows}"
+            "^FO{sku_x},4^A0N,{skuh},{skuw}^FD{sku}^FS"
+            "^FO{name_x},25^A0N,{nh},{nw}^FD{name}^FS"
+            "^FO{name_x},46^A0N,{ph},{pw}^FD{price}^FS"
             "^XZ"
         ).format(
             width=LABEL_WIDTH_DOTS,
             height=LABEL_HEIGHT_DOTS,
-            left1=left1,
-            left2=left2,
-            left3=left3,
-            left4=left4,
-            left5=left5,
+            rows=rows,
+            sku_x=COL_SKU_X,
+            name_x=COL_NAME_X,
+            skuh=FONT_SKU[0], skuw=FONT_SKU[1],
+            nh=FONT_NAME[0], nw=FONT_NAME[1],
+            ph=FONT_PRICE[0], pw=FONT_PRICE[1],
             sku=sku,
             name=name,
             price=price,
