@@ -28,7 +28,7 @@ METAL_ABBR = {
 }
 
 LABEL_WIDTH_DOTS = 406   # 2in @ 203dpi (confirmado contra la impresora real)
-LABEL_HEIGHT_DOTS = 113  # ~0.56in @ 203dpi (confirmado contra la impresora real)
+LABEL_HEIGHT_DOTS = 114  # MEDIDO: getvar zpl.label_length + ~HS (0114)
 
 # Columnas, replicando la etiqueta fisica que ya usa la tienda: la mitad
 # izquierda son DOS sub-columnas (ficha de la piedra | medidas y metal) y la
@@ -38,11 +38,11 @@ COL_A_X, COL_B_X = 10, 120
 COL_NAME_X, COL_SKU_X = 215, 245
 
 # (alto, ancho) por bloque. En ^A0N,h,w el `w` es el ancho NOMINAL por caracter.
-FONT_A = (20, 14)
-FONT_B = (20, 14)
-FONT_SKU = (20, 14)
-FONT_NAME = (17, 11)
-FONT_PRICE = (26, 22)
+FONT_A = (17, 13)
+FONT_B = (17, 13)
+FONT_SKU = (17, 13)
+FONT_NAME = (15, 10)
+FONT_PRICE = (24, 20)
 
 # La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
 # que el ancho nominal (una "i" mucho menos que una "W"). Medido contra el
@@ -50,8 +50,18 @@ FONT_PRICE = (26, 22)
 # factor el recorte era conservador de mas y cortaba texto que si entraba.
 CHAR_W_RATIO = 0.65
 
-FIRST_ROW_Y = 3   # la 5a fila cae en y=91 y termina en 111, dentro de los 113
-ROW_STEP_Y = 22
+# Alto MEDIDO en la impresora real: `! U1 getvar "zpl.label_length"` -> 114 dots
+# (y el ~HS lo confirma en su primer campo: 030,0,0,0114,...).
+#
+# El bloque necesita MARGEN ARRIBA Y ABAJO: el papel tiene un pequeno desfase
+# fisico respecto del origen que asume la impresora, asi que lo impreso muy
+# cerca de y=0 cae sobre el gap y sale cortado. Historia de las dos fallas:
+#   y=4..114 (paso 21, fuente 18) -> se cortaba la ULTIMA fila, abajo
+#   y=3..111 (paso 22, fuente 20) -> se cortaba la PRIMERA fila, arriba
+# Ahora: 10, 29, 48, 67, 86 + 17 de alto = termina en 103, con 10 dots de
+# margen arriba y 11 abajo.
+FIRST_ROW_Y = 10
+ROW_STEP_Y = 19
 
 
 def _fit(text, x_from, x_to, char_w):
@@ -157,8 +167,8 @@ class ProductProduct(models.Model):
             sku_x=COL_SKU_X,
             name_x=COL_NAME_X,
             sku_y=FIRST_ROW_Y,
-            name_y=FIRST_ROW_Y + 24,
-            price_y=FIRST_ROW_Y + 47,
+            name_y=FIRST_ROW_Y + 22,
+            price_y=FIRST_ROW_Y + 43,
             skuh=FONT_SKU[0], skuw=FONT_SKU[1],
             nh=FONT_NAME[0], nw=FONT_NAME[1],
             ph=FONT_PRICE[0], pw=FONT_PRICE[1],
