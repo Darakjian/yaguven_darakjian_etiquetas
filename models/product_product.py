@@ -1,5 +1,7 @@
 from odoo import models
 
+from .logo_zpl import LOGO_ZPL, LOGO_W, LOGO_H
+
 # Prioridad de familia de piedra: la primera que tenga "Carat Weight" cargado
 # es la que se usa para armar la etiqueta.
 STONE_FAMILIES = [
@@ -42,7 +44,7 @@ FONT_A = (17, 13)
 FONT_B = (17, 13)
 FONT_SKU = (17, 13)
 FONT_NAME = (19, 11)  # la descripcion es lo que mas mira el vendedor
-FONT_PRICE = (24, 20)
+FONT_PRICE = (20, 17)  # achicado para hacerle lugar al logo
 
 # La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
 # que el ancho nominal (una "i" mucho menos que una "W"). Medido contra el
@@ -62,6 +64,10 @@ CHAR_W_RATIO = 0.65
 # margen arriba y 11 abajo.
 FIRST_ROW_Y = 10
 ROW_STEP_Y = 19
+
+# El wordmark va abajo a la derecha, con el mismo margen que el resto.
+LOGO_X = LABEL_WIDTH_DOTS - LOGO_W - 8
+LOGO_Y = LABEL_HEIGHT_DOTS - LOGO_H - 8
 
 
 def _fit(text, x_from, x_to, char_w):
@@ -159,6 +165,7 @@ class ProductProduct(models.Model):
             "^FO{sku_x},{sku_y}^A0N,{skuh},{skuw}^FD{sku}^FS"
             "^FO{name_x},{name_y}^A0N,{nh},{nw}^FD{name}^FS"
             "^FO{name_x},{price_y}^A0N,{ph},{pw}^FD{price}^FS"
+            "^FO{logo_x},{logo_y}{logo}^FS"
             "^XZ"
         ).format(
             width=LABEL_WIDTH_DOTS,
@@ -168,11 +175,12 @@ class ProductProduct(models.Model):
             name_x=COL_NAME_X,
             sku_y=FIRST_ROW_Y,
             name_y=FIRST_ROW_Y + 22,
-            price_y=FIRST_ROW_Y + 47,
+            price_y=FIRST_ROW_Y + 45,
             skuh=FONT_SKU[0], skuw=FONT_SKU[1],
             nh=FONT_NAME[0], nw=FONT_NAME[1],
             ph=FONT_PRICE[0], pw=FONT_PRICE[1],
             sku=sku,
             name=name,
             price=price,
+            logo_x=LOGO_X, logo_y=LOGO_Y, logo=LOGO_ZPL,
         )
