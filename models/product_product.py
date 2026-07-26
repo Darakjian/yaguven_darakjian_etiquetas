@@ -1,6 +1,6 @@
 from odoo import models
 
-from .logo_zpl import LOGO_ZPL, LOGO_W, LOGO_H
+from .logo_zpl import LOGO_ZPL
 
 # Prioridad de familia de piedra: la primera que tenga "Carat Weight" cargado
 # es la que se usa para armar la etiqueta.
@@ -32,49 +32,71 @@ METAL_ABBR = {
 LABEL_WIDTH_DOTS = 406   # 2in @ 203dpi (confirmado contra la impresora real)
 LABEL_HEIGHT_DOTS = 114  # MEDIDO: getvar zpl.label_length + ~HS (0114)
 
-# Columnas, replicando la etiqueta fisica que ya usa la tienda: la mitad
-# izquierda son DOS sub-columnas (ficha de la piedra | medidas y metal) y la
-# derecha lleva SKU, descripcion y precio. El SKU va mas a la derecha que el
-# nombre para dejarle lugar al cierre, que antes se le encimaba.
-COL_A_X, COL_B_X = 10, 120
-COL_NAME_X, COL_SKU_X = 205, 245
+X0 = 10                              # margen lateral, parejo de los dos lados
+X1 = LABEL_WIDTH_DOTS - X0
+USABLE_W = X1 - X0                   # 386 dots de ancho util
 
-# (alto, ancho) por bloque. En ^A0N,h,w el `w` es el ancho NOMINAL por caracter.
-FONT_A = (17, 13)
-FONT_B = (17, 13)
-FONT_SKU = (17, 13)
-FONT_NAME = (22, 11)  # la descripcion es lo que mas mira el vendedor
-FONT_PRICE = (20, 17)  # achicado para hacerle lugar al logo
+# --- LAYOUT EN BANDAS -------------------------------------------------------
+# Tres bandas horizontales, cada una con UN significado:
+#
+#   DARAKJIAN  DBRC.00081204                        $ 5,050.00
+#   DIAMOND BEZEL TENNIS BRACELET
+#   2.05Ct x57 SI2 G-H Color Mined | 14k YG | 7.00" | Box
+#
+#   1. identidad y plata: wordmark + SKU centrado + PRECIO a la derecha (arriba
+#      a la derecha es donde cae el ojo primero).
+#   2. QUE ES la pieza: la descripcion sola, a lo ancho de la etiqueta.
+#   3. la ficha en una sola linea corrida, agrupada por sentido con "|":
+#      piedra | aleacion | medida.
+#
+# POR QUE se dejaron las dos columnas de la etiqueta heredada: eran valores SIN
+# ROTULO y CON HUECOS -- si la pieza no tenia cierre, lo de abajo "subia" y el
+# mismo renglon cambiaba de significado segun la fila. Con el renglon corrido,
+# si un dato falta el texto simplemente se acorta: no deja hueco ni corre de
+# lugar a los demas.
+#
+# Y hay un efecto colateral que justifica el cambio por si solo: usando los 386
+# dots enteros en vez de los ~200 de una columna derecha, las descripciones
+# entran COMPLETAS. Antes se cortaban a mitad de palabra ("...TENNIS BRACELE").
+#
+# El bloque va de y=14 a y=94 sobre 114 de alto: 14 dots de margen arriba y 20
+# abajo. Ese aire es lo que evita que el registro del papel se coma la primera
+# o la ultima fila, que era el defecto de las versiones anteriores (el bloque
+# llegaba a 10 dots del borde de arriba y 8 del de abajo, y en las fotos de la
+# tienda se cortaba arriba en unas etiquetas y abajo en otras).
+Y_TOP_BAND = 14        # el precio, que es el bloque mas alto de la banda 1
+Y_LOGO_SKU = 17        # wordmark y SKU, bajados para que apoyen con el precio
+Y_NAME = 46
+Y_SPEC = 78
+
+FONT_SKU = (18, 13)
+FONT_PRICE = (24, 19)  # el ancho se achica solo si el importe es largo
+FONT_NAME = (24, 13)   # el ANCHO era lo que la dejaba condensada, no el alto
+FONT_SPEC = (16, 11)
 
 # La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
 # que el ancho nominal (una "i" mucho menos que una "W"). Medido contra el
-# render real de la etiqueta, el promedio ronda el 65% del nominal. Sin este
-# factor el recorte era conservador de mas y cortaba texto que si entraba.
+# render real de la etiqueta, el promedio ronda el 65% del nominal.
 CHAR_W_RATIO = 0.65
 
-# Alto MEDIDO en la impresora real: `! U1 getvar "zpl.label_length"` -> 114 dots
-# (y el ~HS lo confirma en su primer campo: 030,0,0,0114,...).
-#
-# El bloque necesita MARGEN ARRIBA Y ABAJO: el papel tiene un pequeno desfase
-# fisico respecto del origen que asume la impresora, asi que lo impreso muy
-# cerca de y=0 cae sobre el gap y sale cortado. Historia de las dos fallas:
-#   y=4..114 (paso 21, fuente 18) -> se cortaba la ULTIMA fila, abajo
-#   y=3..111 (paso 22, fuente 20) -> se cortaba la PRIMERA fila, arriba
-# Ahora: 10, 29, 48, 67, 86 + 17 de alto = termina en 103, con 10 dots de
-# margen arriba y 11 abajo.
-FIRST_ROW_Y = 10
-ROW_STEP_Y = 19
-
-# El wordmark va abajo a la derecha, con el mismo margen que el resto.
-LOGO_X = LABEL_WIDTH_DOTS - LOGO_W - 8
-LOGO_Y = LABEL_HEIGHT_DOTS - LOGO_H - 8
+SPEC_SEP = " | "
 
 
-def _fit(text, x_from, x_to, char_w):
-    """Recorta el texto a los caracteres que entran entre dos columnas."""
+def _text_w(text, char_w):
+    """Ancho aproximado en dots que ocupa un texto con ese ancho nominal."""
+    return len(text) * char_w * CHAR_W_RATIO
+
+
+def _fit(text, avail_dots, char_w):
+    """Recorta el texto a los caracteres que entran en el ancho disponible."""
     if not text:
         return ""
-    return text[: max(0, int((x_to - x_from) / (char_w * CHAR_W_RATIO)))]
+    return text[: max(0, int(avail_dots / (char_w * CHAR_W_RATIO)))]
+
+
+def _zpl_safe(text):
+    """`^` y `~` son los prefijos de comando de ZPL: en un ^FD parten la etiqueta."""
+    return (text or "").replace("^", " ").replace("~", " ")
 
 
 class ProductProduct(models.Model):
@@ -121,66 +143,76 @@ class ProductProduct(models.Model):
                 return attr_map[name]
         return ""
 
-    def get_jewelry_label_zpl(self):
+    def _get_label_spec_line(self):
+        """La banda 3: la ficha en un renglon, agrupada por sentido.
+
+        Cada grupo se arma solo con los datos que existen y los grupos vacios no
+        aportan separador -- por eso el renglon nunca queda con huecos.
+        """
         self.ensure_one()
         attr_map = self._get_attribute_map()
         specs = self._get_stone_specs(attr_map)
-        karatage = attr_map.get("Karatage", "")
         metal = attr_map.get("Material") or attr_map.get("Primary Color", "")
         metal = METAL_ABBR.get(metal, metal)
         origin = attr_map.get("Diamond Origin") or attr_map.get("Center Diamond Origin", "")
-        measure = self._first_of(attr_map, MEASURE_ATTRS)
-        clasp = self._first_of(attr_map, CLASP_ATTRS)
 
-        sku = _fit(self.default_code or "", COL_SKU_X, LABEL_WIDTH_DOTS, FONT_SKU[1])
-        name = _fit(self.name or "", COL_NAME_X, LABEL_WIDTH_DOTS, FONT_NAME[1])
+        quantity = specs.get("quantity", "")
+        carat = " ".join(v for v in (
+            specs.get("carat", ""), ("x%s" % quantity) if quantity else "") if v)
+        piedra = " ".join(v for v in (
+            carat, specs.get("clarity", ""), specs.get("color", ""), origin) if v)
+        aleacion = " ".join(v for v in (attr_map.get("Karatage", ""), metal) if v)
+        medida = " ".join(v for v in (
+            self._first_of(attr_map, MEASURE_ATTRS),
+            self._first_of(attr_map, CLASP_ATTRS)) if v)
+        return SPEC_SEP.join(v for v in (piedra, aleacion, medida) if v)
+
+    def get_jewelry_label_zpl(self):
+        self.ensure_one()
+        sku = _zpl_safe(self.default_code or "")
+        name = _zpl_safe(self.name or "")
+        spec = _zpl_safe(self._get_label_spec_line())
         price = "$ {:,.2f}".format(self.lst_price)
 
-        # Columna A: ficha de la piedra. Columna B: cierre, medida, metal.
-        # Se recortan contra el inicio de la columna vecina para que nunca se
-        # encimen (el cierre montandose sobre el SKU era el defecto de origen).
-        col_a = [specs.get("carat", ""), specs.get("clarity", ""),
-                 specs.get("color", ""), specs.get("quantity", ""), origin]
-        col_b = [clasp, "", measure, karatage, metal]
-        col_a = [_fit(v, COL_A_X, COL_B_X, FONT_A[1]) for v in col_a]
-        col_b = [_fit(v, COL_B_X, COL_SKU_X - 4 if i == 0 else COL_NAME_X - 4, FONT_B[1])
-                 for i, v in enumerate(col_b)]
-
-        rows = "".join(
-            "^FO{ax},{y}^A0N,{ah},{aw}^FD{a}^FS^FO{bx},{y}^A0N,{bh},{bw}^FD{b}^FS".format(
-                ax=COL_A_X, bx=COL_B_X, y=FIRST_ROW_Y + ROW_STEP_Y * i,
-                ah=FONT_A[0], aw=FONT_A[1], bh=FONT_B[0], bw=FONT_B[1],
-                a=col_a[i], b=col_b[i])
-            for i in range(5)
-        )
+        # El precio se achica solo si el importe es largo, para que no se le
+        # monte al SKU centrado (una pieza de seis cifras los hacia chocar).
+        price_h, price_w = FONT_PRICE
+        sku_half = _text_w(sku, FONT_SKU[1]) / 2.0
+        while price_w > 12 and (
+                X0 + USABLE_W / 2.0 + sku_half + 8 > X1 - _text_w(price, price_w)):
+            price_w -= 1
 
         return (
             "^XA"
             "^PW{width}^LL{height}"
-            # La columna derecha no comparte el paso de las filas de la
-            # izquierda: son tres bloques de altura distinta (SKU, descripcion
-            # y precio destacado), espaciados para que el precio quede alineado
-            # con la fila de la medida, como en la etiqueta fisica.
-            "{rows}"
-            "^FO{sku_x},{sku_y}^A0N,{skuh},{skuw}^FD{sku}^FS"
-            "^FO{name_x},{name_y}^A0N,{nh},{nw}^FD{name}^FS"
-            "^FO{name_x},{price_y}^A0N,{ph},{pw}^FD{price}^FS"
-            "^FO{logo_x},{logo_y}{logo}^FS"
+            # Banda 1: wordmark, SKU centrado y precio alineado a la derecha.
+            # El centrado y la alineacion los hace ^FB sobre el ancho util, asi
+            # el SKU queda al medio sea cual sea el largo del codigo.
+            "^FO{x0},{y_logo}{logo}^FS"
+            "^FO{x0},{y_logo}^A0N,{skuh},{skuw}^FB{usable},1,0,C^FD{sku}^FS"
+            "^FO{x0},{y_top}^A0N,{ph},{pw}^FB{usable},1,0,R^FD{price}^FS"
+            # Banda 2: que es la pieza, a lo ancho. ^FB corta por palabra, no a
+            # mitad de palabra, y admite una segunda linea para nombres largos.
+            "^FO{x0},{y_name}^A0N,{nh},{nw}^FB{usable},2,1,L^FD{name}^FS"
+            # Banda 3: la ficha.
+            "^FO{x0},{y_spec}^A0N,{sh},{sw}^FD{spec}^FS"
             "^XZ"
         ).format(
             width=LABEL_WIDTH_DOTS,
             height=LABEL_HEIGHT_DOTS,
-            rows=rows,
-            sku_x=COL_SKU_X,
-            name_x=COL_NAME_X,
-            sku_y=FIRST_ROW_Y,
-            name_y=FIRST_ROW_Y + 20,
-            price_y=FIRST_ROW_Y + 47,
-            skuh=FONT_SKU[0], skuw=FONT_SKU[1],
-            nh=FONT_NAME[0], nw=FONT_NAME[1],
-            ph=FONT_PRICE[0], pw=FONT_PRICE[1],
+            x0=X0,
+            usable=USABLE_W,
+            y_logo=Y_LOGO_SKU,
+            y_top=Y_TOP_BAND,
+            y_name=Y_NAME,
+            y_spec=Y_SPEC,
+            logo=LOGO_ZPL,
             sku=sku,
-            name=name,
+            skuh=FONT_SKU[0], skuw=FONT_SKU[1],
             price=price,
-            logo_x=LOGO_X, logo_y=LOGO_Y, logo=LOGO_ZPL,
+            ph=price_h, pw=price_w,
+            name=name,
+            nh=FONT_NAME[0], nw=FONT_NAME[1],
+            spec=_fit(spec, USABLE_W, FONT_SPEC[1]),
+            sh=FONT_SPEC[0], sw=FONT_SPEC[1],
         )

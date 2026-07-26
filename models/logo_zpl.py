@@ -6,23 +6,26 @@ sobre fondo BLANCO (es RGBA y la termica no imprime transparencia).
 
 COMO SE AISLA EL WORDMARK (lo que costo dos intentos): el subtitulo "JEWELERS"
 NO se separa cortando a una altura fija, porque **se solapa verticalmente** con
-el wordmark — aca el wordmark ocupa y=12..93 y el subtitulo y=85..105. Cortar
-por porcentaje se come el descendente de la "J" y la marca sale partida abajo.
-Tampoco alcanza con blanquear "de tal fila para abajo" a la derecha: esa franja
-todavia contiene las letras finales del wordmark. El criterio correcto:
-  1. filas donde hay tinta SOLO a la derecha -> ahi vive el subtitulo puro;
-  2. de ahi se saca la x donde arranca el subtitulo;
-  3. subir desde esa banda mientras la zona derecha siga teniendo tinta -> eso
-     delimita exactamente la contaminacion que se solapa con el wordmark;
-  4. blanquear solo ese rectangulo y recien entonces sacar el bbox.
+el wordmark -- en el PNG de 640x118 el wordmark ocupa y=12..93 y el subtitulo
+y=85..105. Cortar por porcentaje se come el descendente de la "J" y la marca
+sale partida abajo. Tampoco alcanza con blanquear "de tal fila para abajo" a la
+derecha: esa franja todavia contiene las letras finales del wordmark. El
+criterio correcto:
+  1. filas donde hay tinta SOLO a la derecha -> ahi vive el subtitulo puro
+     (y=94..105), y de ahi sale la x donde arranca (x=438);
+  2. blanquear el rectangulo x>=438, y>=85 -- el 85 es donde el subtitulo
+     empieza a solaparse con el descendente de la J;
+  3. recien entonces sacar el bbox -> wordmark aislado 619x82.
 
 Se descarta el subtitulo porque a la altura que entra en esta etiqueta cae a
 ~3 dots y es ilegible: es el DPI de la impresora (203), no la resolucion del
 archivo (el logo de darakjian.com es el mismo PNG de 640x118).
 
-Medidas: 150x19 dots @203dpi.
+Medidas: 100x13 dots @203dpi. Antes eran 150x19, cuando el wordmark ocupaba
+una linea entera abajo a la derecha; con el layout en bandas pasa a la banda
+superior, al lado del SKU y del precio, y a ese tamano sigue legible.
 """
 
-LOGO_W = 150
-LOGO_H = 19
-LOGO_ZPL = "^GFA,361,361,19,1FF8003003FF0001C00F87C1F3F003003C01E00F1F007801C3C001C0070700E1E007801E00C00E03807801C0E003E0070600E0E007801F00C00E01C0FC01C0E003E0070C00E0E00FC01F80C00E01E0DC01C0E006F0071800E0E00DC01BC0C00E00E18E01C1E00670077000E0E019E019E0C00E00E18E01E7800C7807F800E0E018E018F0C00E00E38F01FF800C3807B800E0E030F01878C00E00E3FF01C3801FFC071C00E0E03FF0183CC00E01E60381C1C0181C071C00E0E06078181EC00E01C60381C1C0301C070E00E0E06038180FC00E038C03C1C0E0300E070700E0E0C0381807C00E0F0C01C1C078600F070380E0E0C01C1803C01FFC3E03F3E01FF00F8F81F0E1F3E03F3C01C0000000000000020000000000C0000000000000000000000000000000000000C0000000000000000000000000000000000001800000000000000000000000000000000000030000000000000000000000000000000000000200000000000000"
+LOGO_W = 100
+LOGO_H = 13
+LOGO_ZPL = "^GFA,169,169,13,7F00C07F00201C70E70180E06061C0C06180701840C301C070606061E06180701880C303C078606063606180D81900C302E05C606062307700981F00C306604E606063F06301FC1D80C307F0476060641861010C18C0C30C3043A060C41861830618E0C3083041E0618C1C60E2071870C31818C0E0761C0C7036071C1CC7181CC0600000000000000000C0000000000000000000000000800000000000000000000000010000000000"
