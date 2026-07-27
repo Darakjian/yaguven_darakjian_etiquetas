@@ -30,7 +30,9 @@ METAL_ABBR = {
 }
 
 LABEL_WIDTH_DOTS = 406   # 2in @ 203dpi (confirmado contra la impresora real)
-LABEL_HEIGHT_DOTS = 114  # MEDIDO: getvar zpl.label_length + ~HS (0114)
+LABEL_HEIGHT_DOTS = 112  # MEDIDO: calibracion ~JC del 27/07 -> zpl.label_length
+                         # bajo de 0114 a 0112. Los 114 anteriores venian de la
+                         # impresora SIN calibrar: el papel real mide 112 dots.
 
 X0 = 10                              # margen lateral, parejo de los dos lados
 X1 = LABEL_WIDTH_DOTS - X0
@@ -59,15 +61,23 @@ USABLE_W = X1 - X0                   # 386 dots de ancho util
 # dots enteros en vez de los ~200 de una columna derecha, las descripciones
 # entran COMPLETAS. Antes se cortaban a mitad de palabra ("...TENNIS BRACELE").
 #
-# El bloque va de y=14 a y=94 sobre 114 de alto: 14 dots de margen arriba y 20
-# abajo. Ese aire es lo que evita que el registro del papel se coma la primera
-# o la ultima fila, que era el defecto de las versiones anteriores (el bloque
-# llegaba a 10 dots del borde de arriba y 8 del de abajo, y en las fotos de la
-# tienda se cortaba arriba en unas etiquetas y abajo en otras).
-Y_TOP_BAND = 14        # el precio, que es el bloque mas alto de la banda 1
-Y_LOGO_SKU = 17        # wordmark y SKU, bajados para que apoyen con el precio
-Y_NAME = 46
-Y_SPEC = 78
+# El bloque va de y=20 a y=92 sobre 112 de alto: 20 dots de margen arriba y 20
+# abajo, REPARTIDOS PAREJO. Ese aire es lo que evita que el registro del papel
+# se coma la primera o la ultima fila.
+#
+# Historia de por que quedo asi (27/07): con 14 arriba / 20 abajo sobre un alto
+# supuesto de 114, la primera fila salia MUTILADA en las 4 etiquetas de la
+# prueba fisica -- del wordmark, el SKU y el precio quedaban solo los trazos
+# inferiores. No era falta de tinta: la impresora ya estaba en darkness 30/30
+# con transferencia termica. Era registro. Al calibrarla (~JC) aparecio la
+# causa: el papel mide 112 dots, no 114, asi que todo el layout venia dibujado
+# sobre 2 dots que no existen, y el margen de arriba (el mas chico) era el que
+# se pasaba de rosca. Recentrar parejo sobre la medida real tolera el desfase
+# para los dos lados, en vez de apostar a uno.
+Y_TOP_BAND = 20        # el precio, que es el bloque mas alto de la banda 1
+Y_LOGO_SKU = 23        # wordmark y SKU, bajados para que apoyen con el precio
+Y_NAME = 48
+Y_SPEC = 76
 
 FONT_SKU = (18, 13)
 FONT_PRICE = (24, 19)  # el ancho se achica solo si el importe es largo
