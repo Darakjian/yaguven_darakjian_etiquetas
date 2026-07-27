@@ -29,7 +29,13 @@ METAL_ABBR = {
     "Sterling Silver": "SS", "Silver": "SLV", "Stainless Steel": "STL",
 }
 
-LABEL_WIDTH_DOTS = 406   # 2in @ 203dpi (confirmado contra la impresora real)
+LABEL_WIDTH_DOTS = 355   # 1 3/4in @ 203dpi = la PALETA imprimible del tag.
+                         # El tag (Arch Crown TT306N) mide 3 1/2in de largo
+                         # total, pero solo 1 3/4in son imprimibles: el resto es
+                         # la cola que se enrolla en la joya. Imprimiendo sobre
+                         # 406 (2in) los ultimos ~51 dots caian sobre la cola y
+                         # se comian los centavos del precio, que va alineado a
+                         # la derecha.
 LABEL_HEIGHT_DOTS = 112  # MEDIDO: calibracion ~JC del 27/07 -> zpl.label_length
                          # bajo de 0114 a 0112. Los 114 anteriores venian de la
                          # impresora SIN calibrar: el papel real mide 112 dots.

@@ -1,6 +1,6 @@
 {
     "name": "Darakjian - Etiquetas Zebra",
-    "version": "19.0.1.2.0",
+    "version": "19.0.1.3.0",
     "summary": "Impresión de etiquetas de joyería en impresoras Zebra desde el navegador",
     "category": "Inventory",
     "author": "Yaguven C.G.",
