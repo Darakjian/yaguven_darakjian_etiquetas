@@ -42,7 +42,7 @@ LABEL_HEIGHT_DOTS = 112  # MEDIDO: calibracion ~JC del 27/07 -> zpl.label_length
 
 X0 = 10                              # margen lateral, parejo de los dos lados
 X1 = LABEL_WIDTH_DOTS - X0
-USABLE_W = X1 - X0                   # 386 dots de ancho util
+USABLE_W = X1 - X0                   # 335 dots de ancho util
 
 # --- LAYOUT EN BANDAS -------------------------------------------------------
 # Tres bandas horizontales, cada una con UN significado:
@@ -63,8 +63,8 @@ USABLE_W = X1 - X0                   # 386 dots de ancho util
 # si un dato falta el texto simplemente se acorta: no deja hueco ni corre de
 # lugar a los demas.
 #
-# Y hay un efecto colateral que justifica el cambio por si solo: usando los 386
-# dots enteros en vez de los ~200 de una columna derecha, las descripciones
+# Y hay un efecto colateral que justifica el cambio por si solo: usando el ancho
+# entero de la paleta en vez de los ~200 de una columna derecha, las descripciones
 # entran COMPLETAS. Antes se cortaban a mitad de palabra ("...TENNIS BRACELE").
 #
 # El bloque va de y=20 a y=92 sobre 112 de alto: 20 dots de margen arriba y 20
@@ -88,7 +88,8 @@ Y_SPEC = 76
 FONT_SKU = (18, 13)
 FONT_PRICE = (24, 19)  # el ancho se achica solo si el importe es largo
 FONT_NAME = (24, 13)   # el ANCHO era lo que la dejaba condensada, no el alto
-FONT_SPEC = (16, 11)
+FONT_SPEC = (16, 10)   # condensada: con la paleta de 355 el ancho util bajo a
+                       # 335 dots y la ficha se cortaba ("| Size" sin la medida)
 
 # La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
 # que el ancho nominal (una "i" mucho menos que una "W"). Medido contra el
