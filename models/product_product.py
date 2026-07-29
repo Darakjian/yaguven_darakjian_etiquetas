@@ -1,6 +1,7 @@
 from odoo import models
 
-from .logo_zpl import LOGO_ZPL
+# El wordmark (logo_zpl.LOGO_ZPL) se saco del layout a pedido de la tienda el 2026-07-29 para
+# liberar espacio. El modulo se deja disponible por si se decide volver a incluirlo.
 
 # Prioridad de familia de piedra: la primera que tenga "Carat Weight" cargado
 # es la que se usa para armar la etiqueta. Agregadas 2026-07-29 (hallazgo del
@@ -46,19 +47,26 @@ METAL_ABBR = {
     "Sterling Silver": "SS", "Silver": "SLV", "Stainless Steel": "STL",
 }
 
-LABEL_WIDTH_DOTS = 355   # 1 3/4in @ 203dpi = la PALETA imprimible del tag.
-                         # El tag (Arch Crown TT306N) mide 3 1/2in de largo
-                         # total, pero solo 1 3/4in son imprimibles: el resto es
-                         # la cola que se enrolla en la joya. Imprimiendo sobre
-                         # 406 (2in) los ultimos ~51 dots caian sobre la cola y
-                         # se comian los centavos del precio, que va alineado a
-                         # la derecha.
+# LIENZO (^PW) vs CONTENIDO (X0/X1/USABLE_W): son DOS cosas distintas y ahi estuvo el bug.
+#
+# CANVAS_WIDTH_DOTS = el ancho que se le declara a la impresora = el tag ENTERO (3 1/2in @203dpi).
+# Declarar 355 (solo la paleta) hacia que el bloque NO quedara anclado al margen izquierdo real del
+# tag: se probo toda una escalera de zpl.left_position (0, -10, -130, -150, -175, -200) sin resultado
+# estable. Con el lienzo del tag completo y left_position=0, el contenido apoya contra el margen
+# izquierdo de forma estable. Confirmado en la tienda 2026-07-29 ("esa es la que va").
+CANVAS_WIDTH_DOTS = 710
+
+# CONTENT_WIDTH_DOTS = el ancho sobre el que se DIBUJA la ficha = la paleta imprimible (1 3/4in).
+# NO subir esto a 710: el ^FB centra/alinea sobre este ancho, asi que agrandarlo correria el SKU al
+# centro del tag entero y el precio a la punta de la cola de enganche.
+CONTENT_WIDTH_DOTS = 355
+
 LABEL_HEIGHT_DOTS = 112  # MEDIDO: calibracion ~JC del 27/07 -> zpl.label_length
                          # bajo de 0114 a 0112. Los 114 anteriores venian de la
                          # impresora SIN calibrar: el papel real mide 112 dots.
 
 X0 = 10                              # margen lateral, parejo de los dos lados
-X1 = LABEL_WIDTH_DOTS - X0
+X1 = CONTENT_WIDTH_DOTS - X0
 USABLE_W = X1 - X0                   # 335 dots de ancho util
 
 # --- LAYOUT EN BANDAS -------------------------------------------------------
@@ -102,7 +110,8 @@ Y_LOGO_SKU = 23        # wordmark y SKU, bajados para que apoyen con el precio
 Y_NAME = 48
 Y_SPEC = 76
 
-FONT_SKU = (18, 13)
+FONT_SKU = (22, 16)    # agrandada al sacar el wordmark (2026-07-29): el SKU es el dato
+                       # que la tienda busca primero y ahora tiene el lugar libre
 FONT_PRICE = (24, 19)  # el ancho se achica solo si el importe es largo
 FONT_NAME = (24, 13)   # el ANCHO era lo que la dejaba condensada, no el alto
 FONT_SPEC = (16, 10)   # condensada: con la paleta de 355 el ancho util bajo a
@@ -220,11 +229,12 @@ class ProductProduct(models.Model):
 
         return (
             "^XA"
+            # ^PW = el tag ENTERO; el contenido se dibuja sobre USABLE_W (la paleta)
+            # y por eso queda apoyado contra el margen izquierdo.
             "^PW{width}^LL{height}"
-            # Banda 1: wordmark, SKU centrado y precio alineado a la derecha.
-            # El centrado y la alineacion los hace ^FB sobre el ancho util, asi
-            # el SKU queda al medio sea cual sea el largo del codigo.
-            "^FO{x0},{y_logo}{logo}^FS"
+            # Banda 1: SKU centrado y precio alineado a la derecha. El wordmark se
+            # saco a pedido de la tienda (2026-07-29) para liberar espacio; el SKU
+            # ocupa ese lugar con fuente mas grande.
             "^FO{x0},{y_logo}^A0N,{skuh},{skuw}^FB{usable},1,0,C^FD{sku}^FS"
             "^FO{x0},{y_top}^A0N,{ph},{pw}^FB{usable},1,0,R^FD{price}^FS"
             # Banda 2: que es la pieza, a lo ancho. ^FB corta por palabra, no a
@@ -234,7 +244,7 @@ class ProductProduct(models.Model):
             "^FO{x0},{y_spec}^A0N,{sh},{sw}^FD{spec}^FS"
             "^XZ"
         ).format(
-            width=LABEL_WIDTH_DOTS,
+            width=CANVAS_WIDTH_DOTS,
             height=LABEL_HEIGHT_DOTS,
             x0=X0,
             usable=USABLE_W,
@@ -242,7 +252,6 @@ class ProductProduct(models.Model):
             y_top=Y_TOP_BAND,
             y_name=Y_NAME,
             y_spec=Y_SPEC,
-            logo=LOGO_ZPL,
             sku=sku,
             skuh=FONT_SKU[0], skuw=FONT_SKU[1],
             price=price,
