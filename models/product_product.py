@@ -3,7 +3,11 @@ from odoo import models
 from .logo_zpl import LOGO_ZPL
 
 # Prioridad de familia de piedra: la primera que tenga "Carat Weight" cargado
-# es la que se usa para armar la etiqueta.
+# es la que se usa para armar la etiqueta. Agregadas 2026-07-29 (hallazgo del
+# formato nuevo): "Side Diamond", "Marquis Diamond" y "Round Diamond" -- 10
+# piezas del catalogo tienen SOLO estas familias cargadas y la ficha salia sin
+# piedra. Si una pieza tiene mas de una familia (ej. Center + Side), se
+# muestra la de mayor prioridad en esta lista, no ambas.
 STONE_FAMILIES = [
     "Center Diamond",
     "Diamond",
@@ -12,7 +16,20 @@ STONE_FAMILIES = [
     "Sapphire",
     "Ruby",
     "Emerald",
+    "Side Diamond",
+    "Marquis Diamond",
+    "Round Diamond",
 ]
+
+# Casos irregulares: el atributo de carat/cantidad de esa familia NO sigue el
+# patron estandar "<familia> Carat Weight" / "<familia> Quantity".
+CARAT_ATTR_OVERRIDE = {
+    "Marquis Diamond": "Marquis Diamond Weight",
+    "Round Diamond": "Round Diamond Weight",
+}
+QUANTITY_ATTR_OVERRIDE = {
+    "Marquis Diamond": "Marquis Quantity",
+}
 
 # Cascadas de fallback: la primera que tenga valor es la que se imprime. Los
 # atributos son excluyentes por tipo de pieza (un anillo trae Ring Size, un
@@ -143,13 +160,15 @@ class ProductProduct(models.Model):
 
     def _get_stone_specs(self, attr_map):
         for family in STONE_FAMILIES:
-            carat = attr_map.get("%s Carat Weight" % family)
+            carat_attr = CARAT_ATTR_OVERRIDE.get(family, "%s Carat Weight" % family)
+            carat = attr_map.get(carat_attr)
             if carat:
+                qty_attr = QUANTITY_ATTR_OVERRIDE.get(family, "%s Quantity" % family)
                 return {
                     "carat": carat,
                     "clarity": attr_map.get("%s Clarity" % family, ""),
                     "color": attr_map.get("%s Color" % family, ""),
-                    "quantity": attr_map.get("%s Quantity" % family, ""),
+                    "quantity": attr_map.get(qty_attr, ""),
                 }
         return {}
 
