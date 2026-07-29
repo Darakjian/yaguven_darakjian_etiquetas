@@ -117,10 +117,19 @@ FONT_NAME = (24, 13)   # el ANCHO era lo que la dejaba condensada, no el alto
 FONT_SPEC = (16, 10)   # condensada: con la paleta de 355 el ancho util bajo a
                        # 335 dots y la ficha se cortaba ("| Size" sin la medida)
 
-# La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos
-# que el ancho nominal (una "i" mucho menos que una "W"). Medido contra el
-# render real de la etiqueta, el promedio ronda el 65% del nominal.
-CHAR_W_RATIO = 0.65
+# La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos que el ancho
+# nominal (una "i" mucho menos que una "W"). MEDIDO sobre el render real (2026-07-29,
+# _calibrar_char_ratio.py): texto de ficha 0.434-0.439, precios 0.426-0.430, SKUs 0.469-0.486.
+# El 0.65 anterior estaba muy por encima de la realidad y hacia que _fit() recortara las fichas
+# a 51 caracteres cuando en 335 dots entran ~76: 6,4% de las etiquetas salian cortadas a mitad de
+# palabra ("Box w/ Hi", "18k Black Rhodi"). Se usa 0.50, apenas arriba del peor caso medido (SKUs
+# en mayuscula), que es el texto que alimenta la guarda de colision SKU/precio.
+#
+# Ojo: esto sigue siendo una ESTIMACION y el peor caso teorico es mucho peor (una cadena de "W"
+# mide 0.81). Por eso la ficha ya NO se recorta con esta cuenta: se deja que el ^FB de la impresora
+# la ajuste con la metrica real de la fuente (ver get_jewelry_label_zpl). El ratio queda solo para
+# la guarda del precio, donde un desvio chico no pierde informacion.
+CHAR_W_RATIO = 0.50
 
 SPEC_SEP = " | "
 
@@ -131,7 +140,11 @@ def _text_w(text, char_w):
 
 
 def _fit(text, avail_dots, char_w):
-    """Recorta el texto a los caracteres que entran en el ancho disponible."""
+    """Recorta el texto a los caracteres que entran en el ancho disponible.
+
+    YA NO SE USA para la ficha (la ajusta ^FB con la metrica real). Se conserva por si algun
+    campo futuro necesita un recorte duro.
+    """
     if not text:
         return ""
     return text[: max(0, int(avail_dots / (char_w * CHAR_W_RATIO)))]
@@ -240,8 +253,10 @@ class ProductProduct(models.Model):
             # Banda 2: que es la pieza, a lo ancho. ^FB corta por palabra, no a
             # mitad de palabra, y admite una segunda linea para nombres largos.
             "^FO{x0},{y_name}^A0N,{nh},{nw}^FB{usable},2,1,L^FD{name}^FS"
-            # Banda 3: la ficha.
-            "^FO{x0},{y_spec}^A0N,{sh},{sw}^FD{spec}^FS"
+            # Banda 3: la ficha. ^FB (no recorte por cuenta propia): la impresora la ajusta con
+            # la metrica REAL de la fuente y corta por palabra, nunca a mitad de dato. Admite una
+            # 2da linea para las fichas muy largas, que antes se perdian.
+            "^FO{x0},{y_spec}^A0N,{sh},{sw}^FB{usable},2,0,L^FD{spec}^FS"
             "^XZ"
         ).format(
             width=CANVAS_WIDTH_DOTS,
@@ -258,6 +273,6 @@ class ProductProduct(models.Model):
             ph=price_h, pw=price_w,
             name=name,
             nh=FONT_NAME[0], nw=FONT_NAME[1],
-            spec=_fit(spec, USABLE_W, FONT_SPEC[1]),
+            spec=spec,
             sh=FONT_SPEC[0], sw=FONT_SPEC[1],
         )
