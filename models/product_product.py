@@ -240,12 +240,6 @@ class ProductProduct(models.Model):
                 X0 + USABLE_W / 2.0 + sku_half + 8 > X1 - _text_w(price, price_w)):
             price_w -= 1
 
-        # El SKU va centrado (no se toca): pedido explicito de Armen/Gabriel
-        # 2026-07-31 es que la descripcion y la ficha arranquen en el mismo dot
-        # donde cae el borde izquierdo REAL del SKU centrado, no en X0.
-        desc_x0 = max(X0, int(round(X0 + USABLE_W / 2.0 - sku_half)))
-        desc_usable = X1 - desc_x0
-
         return (
             "^XA"
             # ^PW = el tag ENTERO; el contenido se dibuja sobre USABLE_W (la paleta)
@@ -256,23 +250,24 @@ class ProductProduct(models.Model):
             # ocupa ese lugar con fuente mas grande.
             "^FO{x0},{y_logo}^A0N,{skuh},{skuw}^FB{usable},1,0,C^FD{sku}^FS"
             "^FO{x0},{y_top}^A0N,{ph},{pw}^FB{usable},1,0,R^FD{price}^FS"
-            # Banda 2: que es la pieza, a lo ancho. Arranca en desc_x0 (el borde
-            # izquierdo real del SKU centrado), no en x0. ^FB corta por palabra,
-            # no a mitad de palabra, y admite una segunda linea para nombres largos.
-            "^FO{dx0},{y_name}^A0N,{nh},{nw}^FB{dusable},2,1,L^FD{name}^FS"
-            # Banda 3: la ficha, mismo arranque que la banda 2. ^FB (no recorte por
-            # cuenta propia): la impresora la ajusta con la metrica REAL de la
-            # fuente y corta por palabra, nunca a mitad de dato. Admite una 2da
-            # linea para las fichas muy largas, que antes se perdian.
-            "^FO{dx0},{y_spec}^A0N,{sh},{sw}^FB{dusable},2,0,L^FD{spec}^FS"
+            # Banda 2: que es la pieza, a lo ancho. ^FB corta por palabra, no a
+            # mitad de palabra, y admite una segunda linea para nombres largos.
+            # Se probo angostarla para arrancar alineada al SKU centrado
+            # (2026-07-31): eso hacia que nombres que entraban en 1 linea a
+            # 335 dots pasaran a 2, y la 2da linea chocaba contra la ficha
+            # (28 dots de separacion, insuficientes para 2 lineas). Revertido
+            # a pedido del usuario -- sigue arrancando en x0/usable.
+            "^FO{x0},{y_name}^A0N,{nh},{nw}^FB{usable},2,1,L^FD{name}^FS"
+            # Banda 3: la ficha. ^FB (no recorte por cuenta propia): la impresora la ajusta con
+            # la metrica REAL de la fuente y corta por palabra, nunca a mitad de dato. Admite una
+            # 2da linea para las fichas muy largas, que antes se perdian.
+            "^FO{x0},{y_spec}^A0N,{sh},{sw}^FB{usable},2,0,L^FD{spec}^FS"
             "^XZ"
         ).format(
             width=CANVAS_WIDTH_DOTS,
             height=LABEL_HEIGHT_DOTS,
             x0=X0,
             usable=USABLE_W,
-            dx0=desc_x0,
-            dusable=desc_usable,
             y_logo=Y_LOGO_SKU,
             y_top=Y_TOP_BAND,
             y_name=Y_NAME,
