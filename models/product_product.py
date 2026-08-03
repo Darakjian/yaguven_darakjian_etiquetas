@@ -47,112 +47,183 @@ METAL_ABBR = {
     "Sterling Silver": "SS", "Silver": "SLV", "Stainless Steel": "STL",
 }
 
-# LIENZO (^PW) vs CONTENIDO (X0/X1/USABLE_W): son DOS cosas distintas y ahi estuvo el bug.
+# --- GEOMETRIA DEL TAG ------------------------------------------------------
+# LIENZO (^PW) vs CONTENIDO: son DOS cosas distintas y ahi estuvo el bug original.
 #
-# CANVAS_WIDTH_DOTS = el ancho que se le declara a la impresora = el tag ENTERO (3 1/2in @203dpi).
-# Declarar 355 (solo la paleta) hacia que el bloque NO quedara anclado al margen izquierdo real del
-# tag: se probo toda una escalera de zpl.left_position (0, -10, -130, -150, -175, -200) sin resultado
-# estable. Con el lienzo del tag completo y left_position=0, el contenido apoya contra el margen
-# izquierdo de forma estable. Confirmado en la tienda 2026-07-29 ("esa es la que va").
+# CANVAS_WIDTH_DOTS = el ancho que se le declara a la impresora = el tag ENTERO
+# (3 1/2in @203dpi). Declarar solo la paleta hacia que el bloque NO quedara anclado al
+# margen izquierdo real del tag: se probo toda una escalera de zpl.left_position
+# (0, -10, -130, -150, -175, -200) sin resultado estable. Con el lienzo del tag completo
+# y left_position=0 el contenido apoya contra el margen izquierdo de forma estable.
+# Confirmado en la tienda 2026-07-29 ("esa es la que va").
 CANVAS_WIDTH_DOTS = 710
 
-# CONTENT_WIDTH_DOTS = el ancho sobre el que se DIBUJA la ficha = la paleta imprimible (1 3/4in).
-# NO subir esto a 710: el ^FB centra/alinea sobre este ancho, asi que agrandarlo correria el SKU al
-# centro del tag entero y el precio a la punta de la cola de enganche.
+# CONTENT_WIDTH_DOTS = la PALETA imprimible (1 3/4in). La mitad derecha del tag
+# (dots ~355-710) NO es paleta: es la COLA DE ENGANCHE, una tira mas angosta que se
+# enrolla en la joya y queda oculta (confirmado con la foto del troquel real del
+# 2026-07-30). La ficha vive entera dentro de la paleta.
 CONTENT_WIDTH_DOTS = 355
 
-LABEL_HEIGHT_DOTS = 112  # MEDIDO: calibracion ~JC del 27/07 -> zpl.label_length
-                         # bajo de 0114 a 0112. Los 114 anteriores venian de la
-                         # impresora SIN calibrar: el papel real mide 112 dots.
+# Borde fisico derecho del tag. Solo lo usa el ancho del bloque de identidad, que cruza
+# la costura paleta/cola a proposito (ver COL_W).
+TAG_RIGHT_EDGE_DOTS = 695
 
-X0 = 10                              # margen lateral, parejo de los dos lados
-X1 = CONTENT_WIDTH_DOTS - X0
-USABLE_W = X1 - X0                   # 335 dots de ancho util
+LABEL_HEIGHT_DOTS = 112  # el alto del LIENZO que le declaramos a la Zebra (^LL).
+                         # OJO: no es el alto del papel. Ver PAPER_* aca abajo.
 
-# --- LAYOUT EN BANDAS -------------------------------------------------------
-# Tres bandas horizontales, cada una con UN significado:
-#
-#   DARAKJIAN  DBRC.00081204                        $ 5,050.00
-#   DIAMOND BEZEL TENNIS BRACELET
-#   2.05Ct x57 SI2 G-H Color Mined | 14k YG | 7.00" | Box
-#
-#   1. identidad y plata: wordmark + SKU centrado + PRECIO a la derecha (arriba
-#      a la derecha es donde cae el ojo primero).
-#   2. QUE ES la pieza: la descripcion sola, a lo ancho de la etiqueta.
-#   3. la ficha en una sola linea corrida, agrupada por sentido con "|":
-#      piedra | aleacion | medida.
-#
-# POR QUE se dejaron las dos columnas de la etiqueta heredada: eran valores SIN
-# ROTULO y CON HUECOS -- si la pieza no tenia cierre, lo de abajo "subia" y el
-# mismo renglon cambiaba de significado segun la fila. Con el renglon corrido,
-# si un dato falta el texto simplemente se acorta: no deja hueco ni corre de
-# lugar a los demas.
-#
-# Y hay un efecto colateral que justifica el cambio por si solo: usando el ancho
-# entero de la paleta en vez de los ~200 de una columna derecha, las descripciones
-# entran COMPLETAS. Antes se cortaban a mitad de palabra ("...TENNIS BRACELE").
-#
-# El bloque va de y=20 a y=92 sobre 112 de alto: 20 dots de margen arriba y 20
-# abajo, REPARTIDOS PAREJO. Ese aire es lo que evita que el registro del papel
-# se coma la primera o la ultima fila.
-#
-# Historia de por que quedo asi (27/07): con 14 arriba / 20 abajo sobre un alto
-# supuesto de 114, la primera fila salia MUTILADA en las 4 etiquetas de la
-# prueba fisica -- del wordmark, el SKU y el precio quedaban solo los trazos
-# inferiores. No era falta de tinta: la impresora ya estaba en darkness 30/30
-# con transferencia termica. Era registro. Al calibrarla (~JC) aparecio la
-# causa: el papel mide 112 dots, no 114, asi que todo el layout venia dibujado
-# sobre 2 dots que no existen, y el margen de arriba (el mas chico) era el que
-# se pasaba de rosca. Recentrar parejo sobre la medida real tolera el desfase
+# --- EL PAPEL DE VERDAD, MEDIDO SOBRE LA FOTO DEL TROQUEL (2026-08-02) -------
+# Registrando el ZPL contra las 3 etiquetas impresas de la foto de la tienda
+# (_calibrar_modelo_sobre_foto.py, correlacion 0.75 en las tres) se midio que el troquel
+# NO coincide con el lienzo:
+#   - el papel avanza 127 dots por etiqueta, no 112;
+#   - arranca en el dot -20, o sea ANTES del y=0 del ZPL: esa franja de papel existe pero
+#     la impresora no la alcanza, se pierde;
+#   - y el corte cae en el dot +107, o sea 5 ANTES del final del lienzo.
+# Consecuencia practica: el limite de abajo no es el ^LL sino el corte del troquel, y hay
+# 15 dots mas de papel util de los que el lienzo hacia suponer.
+PAPER_TOP_DOTS = -20     # informativo: no se puede imprimir ahi
+PAPER_CUT_DOTS = 107     # el corte del troquel: NINGUN campo puede pasar de aca
+
+# LA LINEA DE PLEGADO. El tag trae un doblez vertical propio (se ve en las etiquetas
+# virgenes de la tira, corre de corte a corte) en el punto medio exacto del bloque
+# imprimible, que va del dot 5 al 357. Confirmado por la tienda: el tag SE DOBLA ahi.
+# Es un limite duro: el texto que la cruza se quiebra en el pliegue y ademas queda
+# repartido entre las dos caras del tag doblado. Por eso el pliegue se usa como FRONTERA
+# de layout -- la ficha termina antes, el bloque de identidad empieza despues.
+FOLD_DOTS = 182
+FOLD_CLEARANCE = 6       # aire a cada lado del pliegue: el texto no apoya sobre la marca
+
+X0 = 10                  # margen lateral, parejo de los dos lados
+
+# MARGEN VERTICAL 20 arriba / 20 abajo, NO NEGOCIABLE. La prueba fisica del 30/07 salio
+# con la primera linea MUTILADA (solo los trazos inferiores del SKU y de la primera fila
+# de la ficha) porque la maqueta arrancaba en y=6/8 para meter una fila mas: el registro
+# del papel se come esa franja. Recentrar parejo sobre el alto real tolera el desfase
 # para los dos lados, en vez de apostar a uno.
-Y_TOP_BAND = 20        # el precio, que es el bloque mas alto de la banda 1
-Y_LOGO_SKU = 23        # wordmark y SKU, bajados para que apoyen con el precio
-Y_NAME = 50            # +2 dots (2026-07-31): pedido de Armen/Gabriel, se pegaba al borde del troquel
-Y_SPEC = 78            # +2 dots (2026-07-31): idem, validado en la impresora por el usuario
-
-FONT_SKU = (22, 16)    # agrandada al sacar el wordmark (2026-07-29): el SKU es el dato
-                       # que la tienda busca primero y ahora tiene el lugar libre
-FONT_PRICE = (24, 19)  # el ancho se achica solo si el importe es largo
-FONT_NAME = (24, 13)   # el ANCHO era lo que la dejaba condensada, no el alto
-FONT_SPEC = (16, 10)   # condensada: con la paleta de 355 el ancho util bajo a
-                       # 335 dots y la ficha se cortaba ("| Size" sin la medida)
-
-# La fuente A0 es escalable y PROPORCIONAL: cada caracter ocupa bastante menos que el ancho
-# nominal (una "i" mucho menos que una "W"). MEDIDO sobre el render real (2026-07-29,
-# _calibrar_char_ratio.py): texto de ficha 0.434-0.439, precios 0.426-0.430, SKUs 0.469-0.486.
-# El 0.65 anterior estaba muy por encima de la realidad y hacia que _fit() recortara las fichas
-# a 51 caracteres cuando en 335 dots entran ~76: 6,4% de las etiquetas salian cortadas a mitad de
-# palabra ("Box w/ Hi", "18k Black Rhodi"). Se usa 0.50, apenas arriba del peor caso medido (SKUs
-# en mayuscula), que es el texto que alimenta la guarda de colision SKU/precio.
 #
-# Ojo: esto sigue siendo una ESTIMACION y el peor caso teorico es mucho peor (una cadena de "W"
-# mide 0.81). Por eso la ficha ya NO se recorta con esta cuenta: se deja que el ^FB de la impresora
-# la ajuste con la metrica real de la fuente (ver get_jewelry_label_zpl). El ratio queda solo para
-# la guarda del precio, donde un desvio chico no pierde informacion.
-CHAR_W_RATIO = 0.50
+# Consecuencia de diseno: el alto util no son 112 dots sino 72 (de y=20 a y=92). Por eso
+# la ficha va en 4 filas y no en 5.
+Y_TOP = 20
+Y_BOT = LABEL_HEIGHT_DOTS - 20        # 92: ningun campo puede terminar mas abajo
 
-SPEC_SEP = " | "
+# --- LAYOUT: ficha en TABLA a la izquierda + identidad a la derecha ----------
+# Es la "alternativa A", que Armen eligio sobre la B el 2026-07-30 porque replica la
+# disposicion de la etiqueta que la tienda ya usa hoy:
+#
+#   10.29Ct x40   Box w/ Hidden Safety     DBRE.00085376
+#   VS            7.00"                    LAB GROWN 10.29Ctw Emerald Tennis Bracelet
+#   G-H Color     14k                      $ 11,165.00
+#   Lab Grown     YG
+#
+# RANURA FIJA: cada atributo tiene su celda reservada. Si la pieza no tiene ese dato la
+# celda queda VACIA y ningun otro valor se corre de lugar. Ese era el defecto de la
+# etiqueta heredada -- valores sin rotulo y con huecos, donde lo de abajo "subia" y el
+# mismo renglon cambiaba de significado segun la pieza.
+#
+# Peso y cantidad van juntos en una celda ("0.62ct x41"), que es como se leen de todas
+# formas: con 72 dots utiles entran 4 filas de 18, no 5.
+GRID = [["carat_qty", "clasp"],
+        ["clarity", "measure"],
+        ["color", "karatage"],
+        ["origin", "metal"]]
+# LA FICHA SE AGRANDO de 14 a 17 de alto (pedido del usuario 2026-08-03: "que sea mas
+# visible") SIN que el texto ocupe un dot mas de ancho. Se puede por como cuantiza el ^A0N:
+# el ancho del glifo lo fija el parametro de ancho, no el alto, y esta escalonado --
+# medido, los anchos 7, 8, 9 y 10 rinden todos lo mismo, y recien en 11 el texto crece.
+# Asi que 17 de alto con 10 de ancho da letras un 21% mas altas y exactamente el mismo
+# ancho que antes. Es gratis: no toca el pliegue ni obliga a repartir las columnas de nuevo.
+#
+# El paso de fila sube de 18 a 20 para mantener el aire entre renglones. Con eso la ficha
+# ocupa 25..102, que es justo donde termina el precio: los dos bloques cierran parejos y
+# quedan 5 dots hasta el corte del troquel, el mismo margen que le dimos al precio.
+TABLE_ROW_STEP = 20
+FONT_TABLE = (17, 10)
 
+# LAS DOS COLUMNAS SE CORRIERON A LA IZQUIERDA (2026-08-03) para que la segunda termine
+# ANTES del pliegue. Antes iban en 10..96 y 98..210: la segunda nacia de un lado del
+# doblez y moria del otro, y "Box w/ Hidden Safety" ya llegaba al dot 183, justo encima
+# de la marca.
+#
+# El ancho de la col 2 lo fija el peor caso REAL del catalogo, no la muestra: el valor de
+# cierre mas largo es "Push Lock w/ Figure 8" = 88 dots (medido sobre el render, no
+# estimado). Y no se puede achicar condensando la fuente: 9, 8 y 7 de ancho dan los
+# mismos 88 dots -- el parametro de ancho del ^A0N toca fondo y deja de condensar.
+# Asi que la col 2 necesita 88 dots si o si, y de ahi sale donde tiene que arrancar:
+#     fin = FOLD_DOTS - FOLD_CLEARANCE = 176   ->   inicio = 176 - 88 = 88
+# A la col 1 le quedan 76 dots (10..86). Alcanza de sobra: su valor mas ancho medido en
+# el catalogo es de 45 dots.
+#
+# Lo que NO resuelve esto: los metales sin abreviar ("Black & Carnation & Grey & Yellow",
+# 139 dots) siguen sin entrar. Ya no entraban antes -- no es una regresion de este cambio,
+# pero queda anotado como pendiente aparte.
+TABLE_COLS_X = [0, 78]                # col 1: la piedra. col 2: medida y aleacion
+TABLE_COL_W = [76, 88]
 
-def _text_w(text, char_w):
-    """Ancho aproximado en dots que ocupa un texto con ese ancho nominal."""
-    return len(text) * char_w * CHAR_W_RATIO
+# La ficha baja 5 dots respecto del margen general (pedido del usuario 2026-08-03). Tiene
+# constante propia y no se toca Y_TOP: Y_TOP tambien gobierna el SKU, asi que moverlo
+# bajaria de arrastre la columna de identidad, que ya esta donde tiene que estar.
+TABLE_NUDGE = 5
+TABLE_TOP = Y_TOP + TABLE_NUDGE       # 25
 
+# Bloque de identidad: SKU, descripcion y precio APILADOS, los tres arrancando en la
+# MISMA columna (pedido de Gabriel por audio, 2026-07-31; antes la descripcion iba en una
+# columna aparte, sobre la cola).
+#
+# Se corrio de 214 a 188 (2026-08-03) para que apoye contra el pliegue en vez de dejar un
+# hueco muerto de 32 dots. Es lo que marco Gabriel en azul sobre la foto: su marca cae
+# justo en ese hueco (dots 184..212), no sobre la columna.
+COL_X = FOLD_DOTS + FOLD_CLEARANCE            # 188: pegado al pliegue, del lado de afuera
 
-def _fit(text, avail_dots, char_w):
-    """Recorta el texto a los caracteres que entran en el ancho disponible.
+# El ancho NO se limita a los 131 dots de paleta que quedan a la derecha: se extiende
+# hasta el borde real del tag, cruzando a proposito la costura paleta/cola. Eso es lo que
+# permite que una descripcion larga entre en UN solo renglon sin achicarle la fuente. El
+# ^PW710 ya ancla el bloque al margen izquierdo, asi que no corre nada del resto.
+COL_W = TAG_RIGHT_EDGE_DOTS - COL_X
 
-    YA NO SE USA para la ficha (la ajusta ^FB con la metrica real). Se conserva por si algun
-    campo futuro necesita un recorte duro.
-    """
-    if not text:
-        return ""
-    return text[: max(0, int(avail_dots / (char_w * CHAR_W_RATIO)))]
+FONT_SKU = (22, 15)
+FONT_DESC = (14, 8)
+FONT_PRICE = (24, 18)
+
+# EL PRECIO SE BAJA hasta apoyar contra el corte del troquel (pedido de Gabriel del
+# 2026-08-01, la marca verde sobre la foto). Ya no se cuelga del Y_BOT del lienzo: se
+# cuelga del PAPEL medido, que es el limite que importa. La marca verde de Gabriel arranca
+# en el dot 78 y este calculo cae exactamente ahi -- la marca y la medicion coinciden solas.
+PRICE_SAFETY = 5         # aire entre el pie del precio y el corte del troquel
+
+Y_SKU = Y_TOP + 2
+Y_PRICE = PAPER_CUT_DOTS - PRICE_SAFETY - FONT_PRICE[0]      # 78
+
+# La descripcion va CENTRADA en el hueco que queda entre el SKU y el precio (pedido de
+# Gabriel 2026-07-31: pegada arriba quedaba "no armonica"), NO a una distancia fija.
+# Calculada asi, si cambian las fuentes o el margen del precio se reacomoda sola.
+#
+# DESC_NUDGE la baja un poco respecto del centro exacto (pedido del usuario 2026-08-03).
+# El centro geometrico la dejaba en y=54 y a ojo quedaba pegada al SKU: el SKU es cuerpo 22
+# y el precio 24, asi que el hueco de arriba "pesa" menos que el de abajo aunque midan lo
+# mismo. Se corrige con el corrimiento, no cableando el valor, para no perder el centrado
+# automatico.
+DESC_NUDGE = 2
+_GAP = Y_PRICE - (Y_SKU + FONT_SKU[0])
+Y_DESC = Y_SKU + FONT_SKU[0] + (_GAP - FONT_DESC[0]) // 2 + DESC_NUDGE
 
 
 def _zpl_safe(text):
     """`^` y `~` son los prefijos de comando de ZPL: en un ^FD parten la etiqueta."""
     return (text or "").replace("^", " ").replace("~", " ")
+
+
+def _field(x, y, font, text, width, lines=1, align="L"):
+    """Un campo de texto.
+
+    El ancho se resuelve con ^FB, o sea que lo ajusta LA IMPRESORA con la metrica real de
+    la fuente y cortando por palabra. No recortamos por cuenta propia: esa cuenta (una
+    estimacion de ancho por caracter) fue la que cortaba las fichas a mitad de palabra
+    -- "Box w/ Hi", "18k Black Rhodi".
+    """
+    if not text:
+        return ""
+    return "^FO%d,%d^A0N,%d,%d^FB%d,%d,1,%s^FD%s^FS" % (
+        x, y, font[0], font[1], width, lines, align, _zpl_safe(text))
 
 
 class ProductProduct(models.Model):
@@ -201,83 +272,43 @@ class ProductProduct(models.Model):
                 return attr_map[name]
         return ""
 
-    def _get_label_spec_line(self):
-        """La banda 3: la ficha en un renglon, agrupada por sentido.
+    def _get_label_cells(self):
+        """Los valores de la ficha SUELTOS, uno por celda de la tabla.
 
-        Cada grupo se arma solo con los datos que existen y los grupos vacios no
-        aportan separador -- por eso el renglon nunca queda con huecos.
+        El layout en ranura fija necesita cada dato por separado para poder darle su
+        posicion reservada; el renglon corrido del layout anterior (piedra | aleacion |
+        medida, todo concatenado) no servia para esto.
         """
         self.ensure_one()
         attr_map = self._get_attribute_map()
         specs = self._get_stone_specs(attr_map)
         metal = attr_map.get("Material") or attr_map.get("Primary Color", "")
-        metal = METAL_ABBR.get(metal, metal)
-        origin = attr_map.get("Diamond Origin") or attr_map.get("Center Diamond Origin", "")
-
+        carat = specs.get("carat", "")
         quantity = specs.get("quantity", "")
-        carat = " ".join(v for v in (
-            specs.get("carat", ""), ("x%s" % quantity) if quantity else "") if v)
-        piedra = " ".join(v for v in (
-            carat, specs.get("clarity", ""), specs.get("color", ""), origin) if v)
-        aleacion = " ".join(v for v in (attr_map.get("Karatage", ""), metal) if v)
-        medida = " ".join(v for v in (
-            self._first_of(attr_map, MEASURE_ATTRS),
-            self._first_of(attr_map, CLASP_ATTRS)) if v)
-        return SPEC_SEP.join(v for v in (piedra, aleacion, medida) if v)
+        return {
+            "carat_qty": carat + ((" x%s" % quantity) if carat and quantity else ""),
+            "clarity": specs.get("clarity", ""),
+            "color": specs.get("color", ""),
+            "origin": (attr_map.get("Diamond Origin")
+                       or attr_map.get("Center Diamond Origin", "")),
+            "karatage": attr_map.get("Karatage", ""),
+            "metal": METAL_ABBR.get(metal, metal),
+            "measure": self._first_of(attr_map, MEASURE_ATTRS),
+            "clasp": self._first_of(attr_map, CLASP_ATTRS),
+        }
 
     def get_jewelry_label_zpl(self):
         self.ensure_one()
-        sku = _zpl_safe(self.default_code or "")
-        name = _zpl_safe(self.name or "")
-        spec = _zpl_safe(self._get_label_spec_line())
-        price = "$ {:,.2f}".format(self.lst_price)
+        cells = self._get_label_cells()
 
-        # El precio se achica solo si el importe es largo, para que no se le
-        # monte al SKU centrado (una pieza de seis cifras los hacia chocar).
-        price_h, price_w = FONT_PRICE
-        sku_half = _text_w(sku, FONT_SKU[1]) / 2.0
-        while price_w > 12 and (
-                X0 + USABLE_W / 2.0 + sku_half + 8 > X1 - _text_w(price, price_w)):
-            price_w -= 1
-
-        return (
-            "^XA"
-            # ^PW = el tag ENTERO; el contenido se dibuja sobre USABLE_W (la paleta)
-            # y por eso queda apoyado contra el margen izquierdo.
-            "^PW{width}^LL{height}"
-            # Banda 1: SKU centrado y precio alineado a la derecha. El wordmark se
-            # saco a pedido de la tienda (2026-07-29) para liberar espacio; el SKU
-            # ocupa ese lugar con fuente mas grande.
-            "^FO{x0},{y_logo}^A0N,{skuh},{skuw}^FB{usable},1,0,C^FD{sku}^FS"
-            "^FO{x0},{y_top}^A0N,{ph},{pw}^FB{usable},1,0,R^FD{price}^FS"
-            # Banda 2: que es la pieza, a lo ancho. ^FB corta por palabra, no a
-            # mitad de palabra, y admite una segunda linea para nombres largos.
-            # Se probo angostarla para arrancar alineada al SKU centrado
-            # (2026-07-31): eso hacia que nombres que entraban en 1 linea a
-            # 335 dots pasaran a 2, y la 2da linea chocaba contra la ficha
-            # (28 dots de separacion, insuficientes para 2 lineas). Revertido
-            # a pedido del usuario -- sigue arrancando en x0/usable.
-            "^FO{x0},{y_name}^A0N,{nh},{nw}^FB{usable},2,1,L^FD{name}^FS"
-            # Banda 3: la ficha. ^FB (no recorte por cuenta propia): la impresora la ajusta con
-            # la metrica REAL de la fuente y corta por palabra, nunca a mitad de dato. Admite una
-            # 2da linea para las fichas muy largas, que antes se perdian.
-            "^FO{x0},{y_spec}^A0N,{sh},{sw}^FB{usable},2,0,L^FD{spec}^FS"
-            "^XZ"
-        ).format(
-            width=CANVAS_WIDTH_DOTS,
-            height=LABEL_HEIGHT_DOTS,
-            x0=X0,
-            usable=USABLE_W,
-            y_logo=Y_LOGO_SKU,
-            y_top=Y_TOP_BAND,
-            y_name=Y_NAME,
-            y_spec=Y_SPEC,
-            sku=sku,
-            skuh=FONT_SKU[0], skuw=FONT_SKU[1],
-            price=price,
-            ph=price_h, pw=price_w,
-            name=name,
-            nh=FONT_NAME[0], nw=FONT_NAME[1],
-            spec=spec,
-            sh=FONT_SPEC[0], sw=FONT_SPEC[1],
-        )
+        zpl = ["^XA^PW%d^LL%d" % (CANVAS_WIDTH_DOTS, LABEL_HEIGHT_DOTS)]
+        for i, row in enumerate(GRID):
+            for j, field in enumerate(row):
+                zpl.append(_field(X0 + TABLE_COLS_X[j], TABLE_TOP + TABLE_ROW_STEP * i,
+                                  FONT_TABLE, cells.get(field, ""), TABLE_COL_W[j]))
+        zpl.append(_field(COL_X, Y_SKU, FONT_SKU, self.default_code or "", COL_W))
+        zpl.append(_field(COL_X, Y_DESC, FONT_DESC, self.name or "", COL_W))
+        zpl.append(_field(COL_X, Y_PRICE, FONT_PRICE,
+                          "$ {:,.2f}".format(self.lst_price), COL_W))
+        zpl.append("^XZ")
+        return "".join(zpl)
