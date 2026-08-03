@@ -1,7 +1,7 @@
 {
-    "name": "Darakjian - Etiquetas Zebra",
-    "version": "19.0.2.5.0",
-    "summary": "Impresión de etiquetas de joyería en impresoras Zebra desde el navegador",
+    "name": "Darakjian - Zebra Tag Printing",
+    "version": "19.0.3.0.0",
+    "summary": "Print jewelry tags on Zebra printers straight from the browser",
     "category": "Inventory",
     "author": "Yaguven C.G.",
     "depends": ["product", "stock"],

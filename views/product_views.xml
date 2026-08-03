@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <xpath expr="//sheet[@name='product_form']" position="before">
                 <header>
-                    <widget name="print_jewelry_label" string="Imprimir etiqueta"/>
+                    <widget name="print_jewelry_label" string="Print Tag"/>
                 </header>
             </xpath>
         </field>

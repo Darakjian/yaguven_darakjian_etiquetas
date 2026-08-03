@@ -6,8 +6,8 @@
                 t-att-disabled="state.printing"
                 t-on-click="onClick">
             <i class="fa fa-print"/>
-            <t t-if="state.printing"> Imprimiendo...</t>
-            <t t-else="1"> Imprimir etiqueta</t>
+            <t t-if="state.printing"> Printing...</t>
+            <t t-else="1"> Print Tag</t>
         </button>
     </t>
 </templates>
