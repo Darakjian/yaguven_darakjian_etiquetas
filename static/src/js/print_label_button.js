@@ -44,6 +44,30 @@ class PrintJewelryLabelButton extends Component {
             this.notification.add("Tag sent to the Zebra printer", {
                 type: "success",
             });
+            // El registro en el chatter va DESPUES del OK del bridge: lo que queda
+            // asentado es lo que efectivamente salio en papel, no cada intento. Y va
+            // en su propio try: si el chatter falla, la etiqueta ya se imprimio igual
+            // y decirle al usuario que no se imprimio seria mentirle.
+            try {
+                await this.orm.call(
+                    "product.product",
+                    "action_log_printed_label",
+                    [[resId]]
+                );
+                // Refrescar es cosmetico (que el mensaje aparezca sin recargar a mano) y
+                // la API de recarga cambia entre versiones: si falla, se traga el error.
+                // El mensaje ya esta posteado; avisar de un problema aca seria confundir.
+                try {
+                    await this.props.record.load();
+                } catch {
+                    // no pasa nada: se ve al refrescar la ficha
+                }
+            } catch (error) {
+                this.notification.add(
+                    "Printed, but the preview could not be logged: " + error.message,
+                    { type: "warning" }
+                );
+            }
         } catch (error) {
             this.notification.add("Could not print: " + error.message, {
                 type: "danger",

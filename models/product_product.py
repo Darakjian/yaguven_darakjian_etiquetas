@@ -1,4 +1,16 @@
+import base64
+import hashlib
+import io
+import logging
+
+import requests
+from markupsafe import Markup
+from PIL import Image, ImageDraw
+
 from odoo import models
+from odoo.tools.misc import html_escape
+
+_logger = logging.getLogger(__name__)
 
 # El wordmark (logo_zpl.LOGO_ZPL) se saco del layout a pedido de la tienda el 2026-07-29 para
 # liberar espacio. El modulo se deja disponible por si se decide volver a incluirlo.
@@ -312,3 +324,143 @@ class ProductProduct(models.Model):
                           "$ {:,.2f}".format(self.lst_price), COL_W))
         zpl.append("^XZ")
         return "".join(zpl)
+
+    # --- VISTA PREVIA EN EL CHATTER -----------------------------------------
+    # Lo que se imprime se registra en el chatter de la variante con la imagen de la
+    # etiqueta SOBRE EL TROQUEL. Sin el troquel dibujado la imagen enganha: el render
+    # crudo del ZPL muestra un lienzo de 112 dots que no existe en el papel, no dice
+    # donde cae el corte ni donde se dobla el tag, y son justo los dos limites contra
+    # los que se valida un layout.
+
+    LABELARY_URL = "http://api.labelary.com/v1/printers/8dpmm/labels/3.5x0.55/0/"
+    PREVIEW_SCALE = 4          # 1 px por dot es ilegible en pantalla; 4x da 2840x508
+    PREVIEW_LEGEND_H = 108     # banda de abajo para los rotulos
+
+    def _legend_font(self):
+        """La fuente por defecto de PIL mide 11px y sobre un lienzo de 2840 no se lee. Se
+        usa DejaVu, que esta en la imagen de Odoo.sh (verificado), con fallback por si
+        manana no esta: la vista previa no puede caerse por una tipografia."""
+        from PIL import ImageFont
+        for ruta in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                     "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf"):
+            try:
+                return ImageFont.truetype(ruta, 26)
+            except OSError:
+                continue
+        return ImageFont.load_default()
+
+    def _labelary_png(self, zpl):
+        """Rasteriza el ZPL con Labelary: es un interprete ZPL real, asi que el PNG es
+        lo que sale por la Zebra y no una aproximacion nuestra. Devuelve None si el
+        servicio no responde -- el registro de la impresion no depende de la imagen."""
+        try:
+            r = requests.post(self.LABELARY_URL, data=zpl.encode("utf8"), timeout=10)
+            r.raise_for_status()
+            return r.content
+        except Exception as e:
+            _logger.warning("Labelary no pudo rasterizar la etiqueta: %s", e)
+            return None
+
+    def _draw_die_cut(self, png_bytes):
+        """Pega el render sobre el papel REAL y le dibuja el troquel encima.
+
+        El render viene con el lienzo del ZPL (y=0..111). El papel no coincide: arranca
+        en el dot -20 (esa franja existe pero el cabezal no la alcanza) y el corte cae
+        en el +107. Por eso el render se corta en 107 y se pega 20 dots mas abajo: asi
+        las coordenadas de la imagen son las del PAPEL, no las del lienzo.
+
+        Codigo de color daltonico-seguro (azul/naranja, nunca verde/rojo): AZUL el borde
+        del troquel y la costura de la cola, NARANJA el pliegue -- que es el unico limite
+        que rompe el texto en dos caras y conviene que salte a la vista.
+        """
+        render = Image.open(io.BytesIO(png_bytes)).convert("L")
+        alto_papel = PAPER_CUT_DOTS - PAPER_TOP_DOTS          # 127
+        desplaz = -PAPER_TOP_DOTS                             # 20
+
+        papel = Image.new("L", (CANVAS_WIDTH_DOTS, alto_papel), 255)
+        papel.paste(render.crop((0, 0, CANVAS_WIDTH_DOTS,
+                                 min(PAPER_CUT_DOTS, render.height))), (0, desplaz))
+
+        s = self.PREVIEW_SCALE
+        # NEAREST y no bicubico: cada dot tiene que verse como el cuadrado que es. Suavizar
+        # la escala inventa grises y hace parecer legible un texto que en el papel no lo es.
+        out = papel.resize((CANVAS_WIDTH_DOTS * s, alto_papel * s),
+                           Image.NEAREST).convert("RGB")
+        lienzo = Image.new("RGB", (out.width, out.height + self.PREVIEW_LEGEND_H), "white")
+        lienzo.paste(out, (0, 0))
+        d = ImageDraw.Draw(lienzo)
+
+        AZUL, NARANJA, GRIS = (0, 82, 155), (214, 106, 0), (150, 150, 150)
+
+        # Franja de arriba que el cabezal no alcanza: se raya para que no se confunda con
+        # papel util. Es de donde salio el "esta impreso muy alto" que la tienda veia.
+        for x in range(0, lienzo.width, 12):
+            d.line([(x, 0), (x + desplaz * s, desplaz * s)], fill=GRIS, width=1)
+        d.line([(0, desplaz * s), (lienzo.width, desplaz * s)], fill=GRIS, width=2)
+
+        d.rectangle([(0, 0), (out.width - 1, out.height - 1)], outline=AZUL, width=3)
+
+        for x_dot, color, ancho in ((FOLD_DOTS, NARANJA, 3),
+                                    (CONTENT_WIDTH_DOTS, AZUL, 2)):
+            x = x_dot * s
+            for y in range(0, out.height, 16):     # punteada: no tapa lo que hay debajo
+                d.line([(x, y), (x, y + 8)], fill=color, width=ancho)
+
+        fuente = self._legend_font()
+        base = out.height + 10
+        for i, (texto, color) in enumerate((
+            ("AZUL: borde del troquel (corte en el dot %d) y costura de la cola de "
+             "enganche (dot %d, se enrolla y queda oculta)"
+             % (PAPER_CUT_DOTS, CONTENT_WIDTH_DOTS), AZUL),
+            ("NARANJA: linea de plegado (dot %d) -- lo que la cruza se parte entre las "
+             "dos caras del tag" % FOLD_DOTS, NARANJA),
+            ("RAYADO: los %d dots de papel que el cabezal no alcanza (arrancan antes "
+             "del y=0)" % desplaz, GRIS),
+        )):
+            d.text((10, base + i * 32), texto, fill=color, font=fuente)
+
+        buf = io.BytesIO()
+        lienzo.save(buf, format="PNG")
+        return buf.getvalue()
+
+    def _label_preview_attachment(self, zpl):
+        """Adjunto de la vista previa, cacheado por hash del ZPL: mientras la etiqueta no
+        cambie no se vuelve a pedir el render, aunque se imprima diez veces."""
+        self.ensure_one()
+        firma = hashlib.sha256(zpl.encode("utf8")).hexdigest()[:12]
+        nombre = "etiqueta_%s_%s.png" % (self.default_code or self.id, firma)
+        Att = self.env["ir.attachment"]
+        att = Att.search([("res_model", "=", "product.product"),
+                          ("res_id", "=", self.id), ("name", "=", nombre)], limit=1)
+        if att:
+            return att
+        crudo = self._labelary_png(zpl)
+        if not crudo:
+            return Att
+        return Att.create({
+            "name": nombre,
+            "res_model": "product.product",
+            "res_id": self.id,
+            "mimetype": "image/png",
+            "datas": base64.b64encode(self._draw_die_cut(crudo)),
+        })
+
+    def action_log_printed_label(self):
+        """La llama el boton DESPUES de que el bridge confirmo la impresion. Se postea lo
+        que efectivamente salio en papel; los intentos fallidos no ensucian el chatter."""
+        self.ensure_one()
+        zpl = self.get_jewelry_label_zpl()
+        att = self._label_preview_attachment(zpl)
+
+        cuerpo = "<p><strong>Tag printed</strong> &mdash; %s</p>" % html_escape(
+            self.default_code or self.display_name)
+        if not att:
+            cuerpo += ("<p>La etiqueta salio por la impresora, pero no se pudo generar la "
+                       "vista previa (el render no respondio).</p>")
+        self.message_post(
+            body=Markup(cuerpo),
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+            attachment_ids=att.ids,
+        )
+        return True

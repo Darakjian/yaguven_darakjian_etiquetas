@@ -10,6 +10,13 @@
                     <widget name="print_jewelry_label" string="Print Tag"/>
                 </header>
             </xpath>
+            <!-- La variante SOPORTA chatter (hereda mail.thread) pero su ficha no lo
+                 mostraba: sin esto la vista previa de la etiqueta se postea y no la ve
+                 nadie. En una joyeria cada variante es una pieza fisica, asi que el
+                 historial por variante es util mas alla de la etiqueta. -->
+            <xpath expr="//sheet[@name='product_form']" position="after">
+                <chatter/>
+            </xpath>
         </field>
     </record>
 </odoo>
