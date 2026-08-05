@@ -192,7 +192,30 @@ COL_X = FOLD_DOTS + FOLD_CLEARANCE            # 188: pegado al pliegue, del lado
 # ^PW710 ya ancla el bloque al margen izquierdo, asi que no corre nada del resto.
 COL_W = TAG_RIGHT_EDGE_DOTS - COL_X
 
-FONT_SKU = (22, 15)
+# EL SKU NO VA EN LA FUENTE ESCALABLE (2026-08-05). La `A0` es la unica proporcional y
+# escalable de la Zebra, y a este cuerpo CONDENSA EL TRAZO: los digitos se empastan y se
+# leen montados. Es lo que Gabriel viene marcando desde el 04/08, y no se arregla con
+# tamano -- se probaron 18,13 / 22,13 / 22,15 / 24,13 y el defecto sigue. Hay que salir de
+# la familia escalable.
+#
+# Se imprimieron tres demos fisicas con el mismo SKU y Armen eligio la primera (fuente D,
+# `^ADN,18,10`), pidiendola un 20% mas chica. LA D NO SE PUEDE ACHICAR: las bitmap de paso
+# fijo no bajan de su tamano base -- `^ADN,14,8` devuelve un render IDENTICO al de
+# `^ADN,18,10` (153x14 dots, medido en Labelary). El escalon siguiente hacia abajo dentro
+# de la familia es la B, y cae casi exacto en el 20% pedido:
+#
+#   `DBRE.00085376`   D 18,10 -> 153x14 dots      B 11,7 -> 115x11 dots  (-25% / -21%)
+#   peor caso del catalogo (`CA.WATC.10042892`, 16 car.):  D 188      B 142
+#
+# Entra de sobra: la columna del SKU son COL_W = 507 dots, o sea que el peor SKU del
+# catalogo ocupa el 28%. De 23.730 SKUs de v19 el mas largo tiene 16 caracteres.
+#
+# El cuerpo NO es libre: 11,7 es el tamano base de la B. Cualquier otro par se ignora y la
+# impresora dibuja igual el base, asi que cambiarlo aca no tiene efecto -- para agrandar o
+# achicar hay que saltar de fuente (A=9x5, B=11x7, D=18x10, F=26x13, E=28x15).
+FONT_SKU = (11, 7)
+FONT_SKU_CMD = "ABN"
+
 FONT_DESC = (14, 8)
 FONT_PRICE = (24, 18)
 
@@ -224,18 +247,22 @@ def _zpl_safe(text):
     return (text or "").replace("^", " ").replace("~", " ")
 
 
-def _field(x, y, font, text, width, lines=1, align="L"):
+def _field(x, y, font, text, width, lines=1, align="L", cmd="A0N"):
     """Un campo de texto.
 
     El ancho se resuelve con ^FB, o sea que lo ajusta LA IMPRESORA con la metrica real de
     la fuente y cortando por palabra. No recortamos por cuenta propia: esa cuenta (una
     estimacion de ancho por caracter) fue la que cortaba las fichas a mitad de palabra
     -- "Box w/ Hi", "18k Black Rhodi".
+
+    `cmd` es la fuente. Por defecto la escalable `A0N`, que es la que usan la ficha, la
+    descripcion y el precio. Solo el SKU pasa otra (ver FONT_SKU_CMD): la escalable le
+    empasta los digitos.
     """
     if not text:
         return ""
-    return "^FO%d,%d^A0N,%d,%d^FB%d,%d,1,%s^FD%s^FS" % (
-        x, y, font[0], font[1], width, lines, align, _zpl_safe(text))
+    return "^FO%d,%d^%s,%d,%d^FB%d,%d,1,%s^FD%s^FS" % (
+        x, y, cmd, font[0], font[1], width, lines, align, _zpl_safe(text))
 
 
 class ProductProduct(models.Model):
@@ -318,7 +345,8 @@ class ProductProduct(models.Model):
             for j, field in enumerate(row):
                 zpl.append(_field(X0 + TABLE_COLS_X[j], TABLE_TOP + TABLE_ROW_STEP * i,
                                   FONT_TABLE, cells.get(field, ""), TABLE_COL_W[j]))
-        zpl.append(_field(COL_X, Y_SKU, FONT_SKU, self.default_code or "", COL_W))
+        zpl.append(_field(COL_X, Y_SKU, FONT_SKU, self.default_code or "", COL_W,
+                          cmd=FONT_SKU_CMD))
         zpl.append(_field(COL_X, Y_DESC, FONT_DESC, self.name or "", COL_W))
         zpl.append(_field(COL_X, Y_PRICE, FONT_PRICE,
                           "$ {:,.2f}".format(self.lst_price), COL_W))
