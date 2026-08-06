@@ -235,24 +235,29 @@ COL_W = TAG_RIGHT_EDGE_DOTS - COL_X
 # foto contra el alto del precio, la B rinde 0,64 de esa referencia contra 0,80 de la
 # escalable -- o sea que al salir del empastado tambien se perdio cuerpo. La familia quedo
 # confirmada (la B se lee digito por digito donde la escalable montaba el "526"); lo que
-# faltaba era volver al tamano. Se vuelve a la D, que es la que Armen habia elegido:
+# faltaba era volver al tamano.
 #
-#   fuente     alto de tinta    ancho 13 car.   15 car.   16 car.
-#   B 11,7          11              115           133       142
-#   D 18,10         14              153           177       188
+# LA D NO SIRVE, AUNQUE FUERA LA ELEGIDA: se probo (`^ADN,18,10`) y en el papel el SKU de
+# 15 caracteres termina en el dot 364 con el escalon paleta/cola en el 360 -- toca el
+# troquel. Y no es un caso raro: de 24.388 variantes con SKU en v19, el **51,5% tiene 15
+# caracteres** y el 43,6% tiene 13. El requisito de la tienda es que el SKU no toque el
+# troquelado de ningun lado, asi que la D queda descartada por ancho, no por dibujo.
 #
-# POR QUE NO SE PUEDE SUBIR MAS: el paso siguiente es la B duplicada (`^ABN,22,14`, las
-# bitmap solo escalan en multiplos enteros) y son 267 dots para 15 caracteres -- se come la
-# cola entera. La D es el ultimo escalon que sigue siendo del tamano de un SKU.
+# LA SALIDA: LAS BITMAP ESCALAN ALTO Y ANCHO POR SEPARADO. Medido en Labelary, `^ABN,22,7`
+# es la B con el ALTO duplicado y el ancho SIN tocar -- no es lo mismo que `^ABN,22,14`,
+# que duplica las dos cosas y se come la cola. Los multiplicadores son enteros y cada eje
+# va por su cuenta; un valor que no sea multiplo se redondea para abajo (`^ABN,16,7`
+# dibuja igual que `^ABN,11,7`).
 #
-# EL LARGO REAL DEL CATALOGO, QUE ES LO QUE MANDA: de 24.388 variantes con SKU en v19, el
-# 51,5% tiene 15 caracteres y el 43,6% tiene 13 (16 caracteres son 3 piezas). Con la D, el
-# SKU de 15 termina en el dot 364 y el escalon paleta/cola esta en el 360: se pasa 4 dots.
-# No se pierde nada -- a esa altura hay papel de los dos lados (la cola va del dot 15 al
-# 104) -- y es MENOS de lo que ya cruza la descripcion todos los dias por pedido de Gabriel
-# (termina en el 374). Queda anotado para que la tienda lo mire en el papel.
-FONT_SKU = (18, 10)
-FONT_SKU_CMD = "ADN"
+#   fuente        alto de tinta   ancho 16 car.   termina en el dot
+#   B 11,7             11              142              329
+#   D 18,10            14              188              376   <- toca el escalon (360)
+#   B 22,7             22              142              329   <- 31 dots de aire
+#
+# O sea: mas alto que la D y con el ancho de la B. El costo es la proporcion -- los glifos
+# quedan estirados 2:1, altos y angostos. Es el precio de que entre siempre.
+FONT_SKU = (22, 7)
+FONT_SKU_CMD = "ABN"
 
 FONT_DESC = (14, 8)
 FONT_PRICE = (24, 18)
@@ -282,8 +287,16 @@ Y_PRICE = PAPER_CUT_DOTS - PRICE_SAFETY - FONT_PRICE[0]      # 78
 # es lo que se ve, y despues se convierte a coordenada de ^FO.
 DESC_INK_H = 11
 DESC_INK_OFFSET = -1
+
+# DESC_NUDGE: el centro GEOMETRICO no es el que se ve centrado. Con la ventana en 51..71 el
+# calculo deja la tinta en 55..65 y sobre el papel se lee alta -- pedido de la tienda del
+# 2026-08-06: "que baje 2 dots". Coincide con la medicion: los picos de las dos lineas de
+# troquel salieron en {50, 51, 53} y {70, 72, 73}, o sea que la ventana real esta un par de
+# dots mas abajo que el punto medio de esos grupos. Se corrige con el corrimiento y no
+# cableando el valor, para no perder el centrado automatico si cambia la fuente.
+DESC_NUDGE = 2
 Y_DESC = (COLA_TOP_DOTS + (COLA_BOT_DOTS - COLA_TOP_DOTS - DESC_INK_H) // 2
-          - DESC_INK_OFFSET)
+          - DESC_INK_OFFSET + DESC_NUDGE)
 
 
 def _zpl_safe(text):
