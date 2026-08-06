@@ -76,6 +76,26 @@ CANVAS_WIDTH_DOTS = 710
 # 2026-07-30). La ficha vive entera dentro de la paleta.
 CONTENT_WIDTH_DOTS = 355
 
+# --- LA COLA, MEDIDA SOBRE LA IMPRESION DEL 2026-08-06 ----------------------
+# Registrando el ZPL desplegado contra la foto de las 4 etiquetas (anclando en el centro
+# de tinta del SKU y del precio, que son dots conocidos) se recupero la geometria de la
+# cola. El registro se valida solo: con esa misma escala el borde superior del papel cae
+# en el dot -20 y el corte del troquel en el 105, que son los dos valores que ya estaban
+# medidos por otra via.
+#
+#   - el escalon paleta/cola (la linea vertical) cae en el dot ~360, no en el 355;
+#   - a la derecha de ese escalon hay papel SOLO entre los dots 15 y 104 -- 89 dots, que
+#     es exactamente el 7/16in de la ficha del fabricante;
+#   - y dentro de la cola hay DOS lineas de troquel horizontales, en el 49 y en el 68,
+#     que delimitan una ventana de 19 dots.
+#
+# Esa ventana es la que importa: la descripcion cruza a proposito el escalon (es lo que
+# permite que entre en un renglon), asi que tiene que caer DENTRO de ella. Hasta hoy
+# arrancaba en el dot 49, o sea justo ENCIMA de la linea de arriba, y en la foto se ve la
+# linea del troquel pasando por el medio del texto.
+COLA_TOP_DOTS = 49
+COLA_BOT_DOTS = 68
+
 # Borde fisico derecho del tag. Solo lo usa el ancho del bloque de identidad, que cruza
 # la costura paleta/cola a proposito (ver COL_W).
 TAG_RIGHT_EDGE_DOTS = 695
@@ -202,19 +222,31 @@ COL_W = TAG_RIGHT_EDGE_DOTS - COL_X
 # `^ADN,18,10`), pidiendola un 20% mas chica. LA D NO SE PUEDE ACHICAR: las bitmap de paso
 # fijo no bajan de su tamano base -- `^ADN,14,8` devuelve un render IDENTICO al de
 # `^ADN,18,10` (153x14 dots, medido en Labelary). El escalon siguiente hacia abajo dentro
-# de la familia es la B, y cae casi exacto en el 20% pedido:
+# de la familia es la B, y ahi se fue el 2026-08-05.
 #
-#   `DBRE.00085376`   D 18,10 -> 153x14 dots      B 11,7 -> 115x11 dots  (-25% / -21%)
-#   peor caso del catalogo (`CA.WATC.10042892`, 16 car.):  D 188      B 142
+# EN PAPEL LA B QUEDO CHICA (2026-08-06). La tira que mando la tienda trae las dos: las dos
+# de abajo salieron con la escalable vieja y las dos de arriba con la B. Medido sobre la
+# foto contra el alto del precio, la B rinde 0,64 de esa referencia contra 0,80 de la
+# escalable -- o sea que al salir del empastado tambien se perdio cuerpo. La familia quedo
+# confirmada (la B se lee digito por digito donde la escalable montaba el "526"); lo que
+# faltaba era volver al tamano. Se vuelve a la D, que es la que Armen habia elegido:
 #
-# Entra de sobra: la columna del SKU son COL_W = 507 dots, o sea que el peor SKU del
-# catalogo ocupa el 28%. De 23.730 SKUs de v19 el mas largo tiene 16 caracteres.
+#   fuente     alto de tinta    ancho 13 car.   15 car.   16 car.
+#   B 11,7          11              115           133       142
+#   D 18,10         14              153           177       188
 #
-# El cuerpo NO es libre: 11,7 es el tamano base de la B. Cualquier otro par se ignora y la
-# impresora dibuja igual el base, asi que cambiarlo aca no tiene efecto -- para agrandar o
-# achicar hay que saltar de fuente (A=9x5, B=11x7, D=18x10, F=26x13, E=28x15).
-FONT_SKU = (11, 7)
-FONT_SKU_CMD = "ABN"
+# POR QUE NO SE PUEDE SUBIR MAS: el paso siguiente es la B duplicada (`^ABN,22,14`, las
+# bitmap solo escalan en multiplos enteros) y son 267 dots para 15 caracteres -- se come la
+# cola entera. La D es el ultimo escalon que sigue siendo del tamano de un SKU.
+#
+# EL LARGO REAL DEL CATALOGO, QUE ES LO QUE MANDA: de 24.388 variantes con SKU en v19, el
+# 51,5% tiene 15 caracteres y el 43,6% tiene 13 (16 caracteres son 3 piezas). Con la D, el
+# SKU de 15 termina en el dot 364 y el escalon paleta/cola esta en el 360: se pasa 4 dots.
+# No se pierde nada -- a esa altura hay papel de los dos lados (la cola va del dot 15 al
+# 104) -- y es MENOS de lo que ya cruza la descripcion todos los dias por pedido de Gabriel
+# (termina en el 374). Queda anotado para que la tienda lo mire en el papel.
+FONT_SKU = (18, 10)
+FONT_SKU_CMD = "ADN"
 
 FONT_DESC = (14, 8)
 FONT_PRICE = (24, 18)
@@ -228,18 +260,24 @@ PRICE_SAFETY = 5         # aire entre el pie del precio y el corte del troquel
 Y_SKU = Y_TOP + 2
 Y_PRICE = PAPER_CUT_DOTS - PRICE_SAFETY - FONT_PRICE[0]      # 78
 
-# La descripcion va CENTRADA en el hueco que queda entre el SKU y el precio (pedido de
-# Gabriel 2026-07-31: pegada arriba quedaba "no armonica"), NO a una distancia fija.
-# Calculada asi, si cambian las fuentes o el margen del precio se reacomoda sola.
+# LA DESCRIPCION SE CUELGA DE LA COLA, NO DEL HUECO (2026-08-06). Venia centrada en el
+# espacio libre entre el SKU y el precio, que es un criterio de la PALETA -- y la
+# descripcion es el unico campo que sale de la paleta y sigue sobre la cola. Con las dos
+# lineas de troquel de la cola ya medidas (dots 49 y 68), el centrado bueno es el de esa
+# ventana: asi el pedazo que queda afuera de la paleta cae dentro del recuadro en vez de
+# montarse sobre el corte.
 #
-# DESC_NUDGE la baja un poco respecto del centro exacto (pedido del usuario 2026-08-03).
-# El centro geometrico la dejaba en y=54 y a ojo quedaba pegada al SKU: el SKU es cuerpo 22
-# y el precio 24, asi que el hueco de arriba "pesa" menos que el de abajo aunque midan lo
-# mismo. Se corrige con el corrimiento, no cableando el valor, para no perder el centrado
-# automatico.
-DESC_NUDGE = 2
-_GAP = Y_PRICE - (Y_SKU + FONT_SKU[0])
-Y_DESC = Y_SKU + FONT_SKU[0] + (_GAP - FONT_DESC[0]) // 2 + DESC_NUDGE
+# Lo de antes dejaba la tinta en 49..59, o sea apoyada JUSTO sobre la linea de arriba: en
+# la foto del 06/08 se ve el troquel cruzando el texto de lado a lado. Centrada da 53..63,
+# con 4 dots de aire de cada lado.
+#
+# El cuerpo de la fuente no es el alto de la tinta: la `A0N,14,8` dibuja 11 dots y los
+# arranca UNO ARRIBA del ^FO (las dos cosas medidas en Labelary). Se centra la TINTA, que
+# es lo que se ve, y despues se convierte a coordenada de ^FO.
+DESC_INK_H = 11
+DESC_INK_OFFSET = -1
+Y_DESC = (COLA_TOP_DOTS + (COLA_BOT_DOTS - COLA_TOP_DOTS - DESC_INK_H) // 2
+          - DESC_INK_OFFSET)
 
 
 def _zpl_safe(text):
