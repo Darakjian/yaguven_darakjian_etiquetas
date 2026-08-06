@@ -86,15 +86,21 @@ CONTENT_WIDTH_DOTS = 355
 #   - el escalon paleta/cola (la linea vertical) cae en el dot ~360, no en el 355;
 #   - a la derecha de ese escalon hay papel SOLO entre los dots 15 y 104 -- 89 dots, que
 #     es exactamente el 7/16in de la ficha del fabricante;
-#   - y dentro de la cola hay DOS lineas de troquel horizontales, en el 49 y en el 68,
-#     que delimitan una ventana de 19 dots.
+#   - y dentro de la cola hay DOS lineas de troquel horizontales que delimitan una
+#     ventana de unos 20 dots.
 #
 # Esa ventana es la que importa: la descripcion cruza a proposito el escalon (es lo que
-# permite que entre en un renglon), asi que tiene que caer DENTRO de ella. Hasta hoy
-# arrancaba en el dot 49, o sea justo ENCIMA de la linea de arriba, y en la foto se ve la
-# linea del troquel pasando por el medio del texto.
-COLA_TOP_DOTS = 49
-COLA_BOT_DOTS = 68
+# permite que entre en un renglon), asi que tiene que caer DENTRO de ella. Antes arrancaba
+# en el dot 49, o sea justo ENCIMA de la linea de arriba, y en la foto se veia el troquel
+# pasando por el medio del texto.
+#
+# LOS BORDES SE CORRIGIERON CON LA SEGUNDA IMPRESION (2026-08-06, 13:32). La primera medicion
+# dio 49..68 y con esos valores la descripcion entro en la ventana pero pegada al techo: 1
+# dot de aire arriba contra 6 abajo. Las dos etiquetas nuevas, registradas por separado,
+# ponen las lineas en el 51 y el 71 -- y las dos devuelven el corte del troquel en el dot
+# 106,7 contra el 107 del modelo, que es el control que dice que la escala esta bien.
+COLA_TOP_DOTS = 51
+COLA_BOT_DOTS = 71
 
 # Borde fisico derecho del tag. Solo lo usa el ancho del bloque de identidad, que cruza
 # la costura paleta/cola a proposito (ver COL_W).
