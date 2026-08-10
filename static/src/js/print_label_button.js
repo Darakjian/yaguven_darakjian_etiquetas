@@ -62,7 +62,7 @@ class PrintJewelryLabelButton extends Component {
                 try {
                     await this.props.record.load();
                 } catch {
-                    // no pasa nada: se ve al refrescar la ficha
+                    // no harm done: it shows up on the next refresh of the form
                 }
             } catch (error) {
                 this.notification.add(
