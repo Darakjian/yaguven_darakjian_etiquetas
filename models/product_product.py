@@ -12,15 +12,14 @@ from odoo.tools.misc import html_escape
 
 _logger = logging.getLogger(__name__)
 
-# El wordmark (logo_zpl.LOGO_ZPL) se saco del layout a pedido de la tienda el 2026-07-29 para
-# liberar espacio. El modulo se deja disponible por si se decide volver a incluirlo.
+# The wordmark (logo_zpl.LOGO_ZPL) was pulled from the layout at the store's request on
+# 2026-07-29 to free up room. The module is kept around in case it goes back in.
 
-# Prioridad de familia de piedra: la primera que tenga "Carat Weight" cargado
-# es la que se usa para armar la etiqueta. Agregadas 2026-07-29 (hallazgo del
-# formato nuevo): "Side Diamond", "Marquis Diamond" y "Round Diamond" -- 10
-# piezas del catalogo tienen SOLO estas familias cargadas y la ficha salia sin
-# piedra. Si una pieza tiene mas de una familia (ej. Center + Side), se
-# muestra la de mayor prioridad en esta lista, no ambas.
+# Stone family priority: the first one with a "Carat Weight" filled in is the one used to
+# build the tag. Added on 2026-07-29 while working through the new format: "Side Diamond",
+# "Marquis Diamond" and "Round Diamond" -- 10 pieces in the catalog carry ONLY these
+# families, and their spec block was coming out with no stone at all. When a piece has more
+# than one family (Center + Side, say), the highest one in this list wins; not both.
 STONE_FAMILIES = [
     "Center Diamond",
     "Diamond",
@@ -34,8 +33,8 @@ STONE_FAMILIES = [
     "Round Diamond",
 ]
 
-# Casos irregulares: el atributo de carat/cantidad de esa familia NO sigue el
-# patron estandar "<familia> Carat Weight" / "<familia> Quantity".
+# The odd ones out: for these families the carat/quantity attribute does NOT follow the
+# standard "<family> Carat Weight" / "<family> Quantity" pattern.
 CARAT_ATTR_OVERRIDE = {
     "Marquis Diamond": "Marquis Diamond Weight",
     "Round Diamond": "Round Diamond Weight",
@@ -44,14 +43,14 @@ QUANTITY_ATTR_OVERRIDE = {
     "Marquis Diamond": "Marquis Quantity",
 }
 
-# Cascadas de fallback: la primera que tenga valor es la que se imprime. Los
-# atributos son excluyentes por tipo de pieza (un anillo trae Ring Size, un
-# collar trae Length), por eso ninguno solo alcanza.
+# Fallback cascades: the first one carrying a value is the one printed. These attributes
+# are mutually exclusive by piece type - a ring has a Ring Size, a necklace has a Length -
+# which is why no single one of them is enough on its own.
 MEASURE_ATTRS = ["Ring Size", "Length", "Drop Length", "Width", "Diameter",
                  "Shank Width (M)", "Bracelet/Strap Length", "Gram Weight"]
 CLASP_ATTRS = ["Clasp", "Earring Back", "Case Back"]
 
-# El metal va abreviado, como en la etiqueta que ya usa la tienda ("YG").
+# The metal goes abbreviated, matching the tag the store already uses ("YG").
 METAL_ABBR = {
     "White Gold": "WG", "Yellow Gold": "YG", "Rose Gold": "RG",
     "Pink Gold": "PG", "Two Tone": "2T", "Tri Color": "3T",
@@ -59,262 +58,264 @@ METAL_ABBR = {
     "Sterling Silver": "SS", "Silver": "SLV", "Stainless Steel": "STL",
 }
 
-# --- GEOMETRIA DEL TAG ------------------------------------------------------
-# LIENZO (^PW) vs CONTENIDO: son DOS cosas distintas y ahi estuvo el bug original.
+# --- TAG GEOMETRY -----------------------------------------------------------
+# CANVAS (^PW) vs CONTENT: these are TWO different things, and that is where the original
+# bug lived.
 #
-# CANVAS_WIDTH_DOTS = el ancho que se le declara a la impresora = el tag ENTERO
-# (3 1/2in @203dpi). Declarar solo la paleta hacia que el bloque NO quedara anclado al
-# margen izquierdo real del tag: se probo toda una escalera de zpl.left_position
-# (0, -10, -130, -150, -175, -200) sin resultado estable. Con el lienzo del tag completo
-# y left_position=0 el contenido apoya contra el margen izquierdo de forma estable.
-# Confirmado en la tienda 2026-07-29 ("esa es la que va").
+# CANVAS_WIDTH_DOTS = the width declared to the printer = the WHOLE tag (3 1/2in @203dpi).
+# Declaring only the paddle left the block unanchored from the tag's real left margin: a
+# whole ladder of zpl.left_position values was tried (0, -10, -130, -150, -175, -200) with
+# no stable result. With the full tag as the canvas and left_position=0, the content rests
+# against the left margin consistently. Confirmed at the store on 2026-07-29 ("that's the
+# one").
 CANVAS_WIDTH_DOTS = 710
 
-# CONTENT_WIDTH_DOTS = la PALETA imprimible (1 3/4in). La mitad derecha del tag
-# (dots ~355-710) NO es paleta: es la COLA DE ENGANCHE, una tira mas angosta que se
-# enrolla en la joya y queda oculta (confirmado con la foto del troquel real del
-# 2026-07-30). La ficha vive entera dentro de la paleta.
+# CONTENT_WIDTH_DOTS = the printable PADDLE (1 3/4in). The right half of the tag (dots
+# ~355-710) is NOT paddle: it is the HANG TAIL, a narrower strip that wraps around the
+# piece and stays hidden (confirmed against the photo of the real die-cut on 2026-07-30).
+# The spec block lives entirely inside the paddle.
 CONTENT_WIDTH_DOTS = 355
 
-# --- LA COLA, MEDIDA SOBRE LA IMPRESION DEL 2026-08-06 ----------------------
-# Registrando el ZPL desplegado contra la foto de las 4 etiquetas (anclando en el centro
-# de tinta del SKU y del precio, que son dots conocidos) se recupero la geometria de la
-# cola. El registro se valida solo: con esa misma escala el borde superior del papel cae
-# en el dot -20 y el corte del troquel en el 105, que son los dos valores que ya estaban
-# medidos por otra via.
+# --- THE HANG TAIL, MEASURED AGAINST THE 2026-08-06 PRINT --------------------
+# Registering the deployed ZPL against the photo of the 4 tags (anchoring on the ink centre
+# of the SKU and of the price, both known dots) recovered the tail's geometry. The
+# registration validates itself: at that same scale the top edge of the paper falls at dot
+# -20 and the die-cut at 105, the two values already measured by other means.
 #
-#   - el escalon paleta/cola (la linea vertical) cae en el dot ~360, no en el 355;
-#   - a la derecha de ese escalon hay papel SOLO entre los dots 15 y 104 -- 89 dots, que
-#     es exactamente el 7/16in de la ficha del fabricante;
-#   - y dentro de la cola hay DOS lineas de troquel horizontales que delimitan una
-#     ventana de unos 20 dots.
+#   - the paddle/tail step (the vertical line) falls at dot ~360, not at 355;
+#   - to the right of that step there is paper ONLY between dots 15 and 104 -- 89 dots,
+#     exactly the 7/16in on the manufacturer's spec sheet;
+#   - and inside the tail there are TWO horizontal die lines bounding a window of some
+#     20 dots.
 #
-# Esa ventana es la que importa: la descripcion cruza a proposito el escalon (es lo que
-# permite que entre en un renglon), asi que tiene que caer DENTRO de ella. Antes arrancaba
-# en el dot 49, o sea justo ENCIMA de la linea de arriba, y en la foto se veia el troquel
-# pasando por el medio del texto.
+# That window is what matters: the description crosses the step on purpose, which is what
+# lets it fit on one line, so it has to land INSIDE the window. It used to start at dot 49,
+# right ON TOP of the upper line, and the photo showed the die-cut running through the
+# middle of the text.
 #
-# LOS BORDES SE CORRIGIERON CON LA SEGUNDA IMPRESION (2026-08-06, 13:32). La primera medicion
-# dio 49..68 y con esos valores la descripcion entro en la ventana pero pegada al techo: 1
-# dot de aire arriba contra 6 abajo. Las dos etiquetas nuevas, registradas por separado,
-# ponen las lineas en el 51 y el 71 -- y las dos devuelven el corte del troquel en el dot
-# 106,7 contra el 107 del modelo, que es el control que dice que la escala esta bien.
+# THE EDGES WERE CORRECTED WITH THE SECOND PRINT (2026-08-06, 13:32). The first measurement
+# gave 49..68, and with those values the description did land in the window but pinned to
+# the ceiling: 1 dot of air above against 6 below. The two new tags, registered separately,
+# put the lines at 51 and 71 -- and both return the die-cut at dot 106.7 against the model's
+# 107, which is the control confirming the scale is right.
 COLA_TOP_DOTS = 51
 COLA_BOT_DOTS = 71
 
-# Borde fisico derecho del tag. Solo lo usa el ancho del bloque de identidad, que cruza
-# la costura paleta/cola a proposito (ver COL_W).
+# The tag's physical right edge. Only the width of the identity block uses it, and that
+# block crosses the paddle/tail seam on purpose (see COL_W).
 TAG_RIGHT_EDGE_DOTS = 695
 
-LABEL_HEIGHT_DOTS = 112  # el alto del LIENZO que le declaramos a la Zebra (^LL).
-                         # OJO: no es el alto del papel. Ver PAPER_* aca abajo.
+LABEL_HEIGHT_DOTS = 112  # the height of the CANVAS declared to the Zebra (^LL).
+                         # CAREFUL: not the height of the paper. See PAPER_* below.
 
-# --- EL PAPEL DE VERDAD, MEDIDO SOBRE LA FOTO DEL TROQUEL (2026-08-02) -------
-# Registrando el ZPL contra las 3 etiquetas impresas de la foto de la tienda
-# (_calibrar_modelo_sobre_foto.py, correlacion 0.75 en las tres) se midio que el troquel
-# NO coincide con el lienzo:
-#   - el papel avanza 127 dots por etiqueta, no 112;
-#   - arranca en el dot -20, o sea ANTES del y=0 del ZPL: esa franja de papel existe pero
-#     la impresora no la alcanza, se pierde;
-#   - y el corte cae en el dot +107, o sea 5 ANTES del final del lienzo.
-# Consecuencia practica: el limite de abajo no es el ^LL sino el corte del troquel, y hay
-# 15 dots mas de papel util de los que el lienzo hacia suponer.
-PAPER_TOP_DOTS = -20     # informativo: no se puede imprimir ahi
-PAPER_CUT_DOTS = 107     # el corte del troquel: NINGUN campo puede pasar de aca
+# --- THE REAL PAPER, MEASURED ON THE DIE-CUT PHOTO (2026-08-02) --------------
+# Registering the ZPL against the 3 printed tags in the store's photo
+# (_calibrar_modelo_sobre_foto.py, correlation 0.75 on all three) showed the die-cut does
+# NOT line up with the canvas:
+#   - the paper advances 127 dots per tag, not 112;
+#   - it starts at dot -20, that is BEFORE the ZPL's y=0: that strip of paper exists but
+#     the printhead cannot reach it, so it is lost;
+#   - and the cut falls at dot +107, 5 dots BEFORE the end of the canvas.
+# What this means in practice: the bottom limit is the die-cut, not the ^LL, and there are
+# 15 more dots of usable paper than the canvas suggested.
+PAPER_TOP_DOTS = -20     # informational: nothing can be printed there
+PAPER_CUT_DOTS = 107     # the die-cut: NO field may extend past this
 
-# LA LINEA DE PLEGADO. El tag trae un doblez vertical propio (se ve en las etiquetas
-# virgenes de la tira, corre de corte a corte) en el punto medio exacto del bloque
-# imprimible, que va del dot 5 al 357. Confirmado por la tienda: el tag SE DOBLA ahi.
-# Es un limite duro: el texto que la cruza se quiebra en el pliegue y ademas queda
-# repartido entre las dos caras del tag doblado. Por eso el pliegue se usa como FRONTERA
-# de layout -- la ficha termina antes, el bloque de identidad empieza despues.
+# THE FOLD LINE. The tag carries a vertical fold of its own - visible on the blank tags in
+# the strip, running cut to cut - at the exact midpoint of the printable block, which spans
+# dots 5 to 357. Confirmed by the store: the tag IS folded there. It is a hard limit: text
+# crossing it breaks at the fold and ends up split across the two faces of the folded tag.
+# That is why the fold is used as a layout BOUNDARY - the spec block ends before it, the
+# identity block starts after it.
 FOLD_DOTS = 182
-FOLD_CLEARANCE = 6       # aire a cada lado del pliegue: el texto no apoya sobre la marca
+FOLD_CLEARANCE = 6       # air on each side of the fold: text never rests on the crease
 
-X0 = 10                  # margen lateral, parejo de los dos lados
+X0 = 10                  # side margin, the same on both sides
 
-# MARGEN VERTICAL 20 arriba / 20 abajo, NO NEGOCIABLE. La prueba fisica del 30/07 salio
-# con la primera linea MUTILADA (solo los trazos inferiores del SKU y de la primera fila
-# de la ficha) porque la maqueta arrancaba en y=6/8 para meter una fila mas: el registro
-# del papel se come esa franja. Recentrar parejo sobre el alto real tolera el desfase
-# para los dos lados, en vez de apostar a uno.
+# VERTICAL MARGIN 20 top / 20 bottom, NON-NEGOTIABLE. The physical test on 30/07 came out
+# with the first line MUTILATED - only the lower strokes of the SKU and of the spec block's
+# first row - because the mock-up started at y=6/8 to squeeze in one more row: the paper
+# registration eats that strip. Recentring evenly over the real height absorbs the drift on
+# both sides instead of betting on one.
 #
-# Consecuencia de diseno: el alto util no son 112 dots sino 72 (de y=20 a y=92). Por eso
-# la ficha va en 4 filas y no en 5.
+# Design consequence: the usable height is not 112 dots but 72 (y=20 to y=92). That is why
+# the spec block runs 4 rows and not 5.
 Y_TOP = 20
-Y_BOT = LABEL_HEIGHT_DOTS - 20        # 92: ningun campo puede terminar mas abajo
+Y_BOT = LABEL_HEIGHT_DOTS - 20        # 92: no field may end lower than this
 
-# --- LAYOUT: ficha en TABLA a la izquierda + identidad a la derecha ----------
-# Es la "alternativa A", que Armen eligio sobre la B el 2026-07-30 porque replica la
-# disposicion de la etiqueta que la tienda ya usa hoy:
+# --- LAYOUT: spec block as a TABLE on the left, identity on the right --------
+# This is "option A", which Armen picked over B on 2026-07-30 because it mirrors the layout
+# of the tag the store already uses today:
 #
 #   10.29Ct x40   Box w/ Hidden Safety     DBRE.00085376
 #   VS            7.00"                    LAB GROWN 10.29Ctw Emerald Tennis Bracelet
 #   G-H Color     14k                      $ 11,165.00
 #   Lab Grown     YG
 #
-# RANURA FIJA: cada atributo tiene su celda reservada. Si la pieza no tiene ese dato la
-# celda queda VACIA y ningun otro valor se corre de lugar. Ese era el defecto de la
-# etiqueta heredada -- valores sin rotulo y con huecos, donde lo de abajo "subia" y el
-# mismo renglon cambiaba de significado segun la pieza.
+# FIXED SLOTS: every attribute has its own reserved cell. When a piece lacks that datum
+# the cell is left EMPTY and no other value shifts position. That was the flaw in the
+# inherited tag -- unlabelled values with gaps, where whatever sat below "moved up" and the
+# same line meant different things on different pieces.
 #
-# Peso y cantidad van juntos en una celda ("0.62ct x41"), que es como se leen de todas
-# formas: con 72 dots utiles entran 4 filas de 18, no 5.
+# Weight and quantity share one cell ("0.62ct x41"), which is how they get read anyway:
+# with 72 usable dots there is room for 4 rows of 18, not 5.
 GRID = [["carat_qty", "clasp"],
         ["clarity", "measure"],
         ["color", "karatage"],
         ["origin", "metal"]]
-# LA FICHA SE AGRANDO de 14 a 17 de alto (pedido del usuario 2026-08-03: "que sea mas
-# visible") SIN que el texto ocupe un dot mas de ancho. Se puede por como cuantiza el ^A0N:
-# el ancho del glifo lo fija el parametro de ancho, no el alto, y esta escalonado --
-# medido, los anchos 7, 8, 9 y 10 rinden todos lo mismo, y recien en 11 el texto crece.
-# Asi que 17 de alto con 10 de ancho da letras un 21% mas altas y exactamente el mismo
-# ancho que antes. Es gratis: no toca el pliegue ni obliga a repartir las columnas de nuevo.
+# THE SPEC BLOCK GREW from 14 to 17 in height (user request 2026-08-03: "make it more
+# visible") WITHOUT the text taking up a single dot more in width. This works because of
+# how ^A0N quantizes: the glyph width is set by the width parameter, not the height, and it
+# comes in steps -- measured, widths 7, 8, 9 and 10 all render identically, and only at 11
+# does the text grow. So height 17 with width 10 gives letters 21% taller at exactly the
+# width they had. It is free: it does not touch the fold, nor force the columns to be
+# reallocated.
 #
-# El paso de fila sube de 18 a 20 para mantener el aire entre renglones. Con eso la ficha
-# ocupa 25..102, que es justo donde termina el precio: los dos bloques cierran parejos y
-# quedan 5 dots hasta el corte del troquel, el mismo margen que le dimos al precio.
+# The row step goes from 18 to 20 to keep the air between lines. With that, the spec block
+# occupies 25..102, which is exactly where the price ends: the two blocks close level with
+# each other and leave 5 dots to the die-cut, the same margin given to the price.
 TABLE_ROW_STEP = 20
 FONT_TABLE = (17, 10)
 
-# LAS DOS COLUMNAS SE CORRIERON A LA IZQUIERDA (2026-08-03) para que la segunda termine
-# ANTES del pliegue. Antes iban en 10..96 y 98..210: la segunda nacia de un lado del
-# doblez y moria del otro, y "Box w/ Hidden Safety" ya llegaba al dot 183, justo encima
-# de la marca.
+# BOTH COLUMNS WERE SHIFTED LEFT (2026-08-03) so the second one ends BEFORE the fold. They
+# used to sit at 10..96 and 98..210: the second was born on one side of the crease and died
+# on the other, and "Box w/ Hidden Safety" already reached dot 183, right on top of the
+# fold mark.
 #
-# El ancho de la col 2 lo fija el peor caso REAL del catalogo, no la muestra: el valor de
-# cierre mas largo es "Push Lock w/ Figure 8" = 88 dots (medido sobre el render, no
-# estimado). Y no se puede achicar condensando la fuente: 9, 8 y 7 de ancho dan los
-# mismos 88 dots -- el parametro de ancho del ^A0N toca fondo y deja de condensar.
-# Asi que la col 2 necesita 88 dots si o si, y de ahi sale donde tiene que arrancar:
-#     fin = FOLD_DOTS - FOLD_CLEARANCE = 176   ->   inicio = 176 - 88 = 88
-# A la col 1 le quedan 76 dots (10..86). Alcanza de sobra: su valor mas ancho medido en
-# el catalogo es de 45 dots.
+# The width of column 2 is set by the REAL worst case in the catalog, not by the sample:
+# the longest clasp value is "Push Lock w/ Figure 8" = 88 dots, measured on the render
+# rather than estimated. And it cannot be shrunk by condensing the font: widths 9, 8 and 7
+# all give the same 88 dots -- the ^A0N width parameter bottoms out and stops condensing.
+# So column 2 needs 88 dots no matter what, and that dictates where it has to start:
+#     end = FOLD_DOTS - FOLD_CLEARANCE = 176   ->   start = 176 - 88 = 88
+# That leaves column 1 with 76 dots (10..86). More than enough: its widest value measured
+# across the catalog is 45 dots.
 #
-# Lo que NO resuelve esto: los metales sin abreviar ("Black & Carnation & Grey & Yellow",
-# 139 dots) siguen sin entrar. Ya no entraban antes -- no es una regresion de este cambio,
-# pero queda anotado como pendiente aparte.
-TABLE_COLS_X = [0, 78]                # col 1: la piedra. col 2: medida y aleacion
+# What this does NOT solve: unabbreviated metals ("Black & Carnation & Grey & Yellow", 139
+# dots) still do not fit. They did not fit before either -- this is not a regression of
+# this change, but it is recorded as a separate open item.
+TABLE_COLS_X = [0, 78]                # col 1: the stone. col 2: measurement and alloy
 TABLE_COL_W = [76, 88]
 
-# La ficha baja 5 dots respecto del margen general (pedido del usuario 2026-08-03). Tiene
-# constante propia y no se toca Y_TOP: Y_TOP tambien gobierna el SKU, asi que moverlo
-# bajaria de arrastre la columna de identidad, que ya esta donde tiene que estar.
+# The spec block drops 5 dots below the general margin (user request 2026-08-03). It gets
+# a constant of its own rather than moving Y_TOP: Y_TOP also governs the SKU, so shifting
+# it would drag the identity column down with it, and that column is already where it
+# belongs.
 TABLE_NUDGE = 5
 TABLE_TOP = Y_TOP + TABLE_NUDGE       # 25
 
-# Bloque de identidad: SKU, descripcion y precio APILADOS, los tres arrancando en la
-# MISMA columna (pedido de Gabriel por audio, 2026-07-31; antes la descripcion iba en una
-# columna aparte, sobre la cola).
+# Identity block: SKU, description and price STACKED, all three starting in the SAME
+# column (Gabriel's request by voice note, 2026-07-31; the description used to sit in a
+# column of its own, over the tail).
 #
-# Se corrio de 214 a 188 (2026-08-03) para que apoye contra el pliegue en vez de dejar un
-# hueco muerto de 32 dots. Es lo que marco Gabriel en azul sobre la foto: su marca cae
-# justo en ese hueco (dots 184..212), no sobre la columna.
-COL_X = FOLD_DOTS + FOLD_CLEARANCE            # 188: pegado al pliegue, del lado de afuera
+# Moved from 214 to 188 (2026-08-03) so it rests against the fold instead of leaving 32
+# dots of dead space. That is what Gabriel circled in blue on the photo: his mark falls
+# exactly in that gap (dots 184..212), not on the column.
+COL_X = FOLD_DOTS + FOLD_CLEARANCE            # 188: against the fold, on the outer side
 
-# El ancho NO se limita a los 131 dots de paleta que quedan a la derecha: se extiende
-# hasta el borde real del tag, cruzando a proposito la costura paleta/cola. Eso es lo que
-# permite que una descripcion larga entre en UN solo renglon sin achicarle la fuente. El
-# ^PW710 ya ancla el bloque al margen izquierdo, asi que no corre nada del resto.
+# The width is NOT capped at the 131 dots of paddle left on the right: it runs to the tag's
+# real edge, crossing the paddle/tail seam on purpose. That is what lets a long description
+# fit on ONE line without shrinking its font. ^PW710 already anchors the block to the left
+# margin, so nothing else shifts.
 COL_W = TAG_RIGHT_EDGE_DOTS - COL_X
 
-# EL SKU NO VA EN LA FUENTE ESCALABLE (2026-08-05). La `A0` es la unica proporcional y
-# escalable de la Zebra, y a este cuerpo CONDENSA EL TRAZO: los digitos se empastan y se
-# leen montados. Es lo que Gabriel viene marcando desde el 04/08, y no se arregla con
-# tamano -- se probaron 18,13 / 22,13 / 22,15 / 24,13 y el defecto sigue. Hay que salir de
-# la familia escalable.
+# THE SKU DOES NOT USE THE SCALABLE FONT (2026-08-05). `A0` is the Zebra's only
+# proportional, scalable font, and at this size it CONDENSES THE STROKE: the digits clog up
+# and read as if stacked on each other. This is what Gabriel has been flagging since 04/08,
+# and size does not fix it -- 18,13 / 22,13 / 22,15 and 24,13 were all tried and the defect
+# persists. The scalable family has to be abandoned.
 #
-# Se imprimieron tres demos fisicas con el mismo SKU y Armen eligio la primera (fuente D,
-# `^ADN,18,10`), pidiendola un 20% mas chica. LA D NO SE PUEDE ACHICAR: las bitmap de paso
-# fijo no bajan de su tamano base -- `^ADN,14,8` devuelve un render IDENTICO al de
-# `^ADN,18,10` (153x14 dots, medido en Labelary). El escalon siguiente hacia abajo dentro
-# de la familia es la B, y ahi se fue el 2026-08-05.
+# Three physical demos were printed with the same SKU and Armen picked the first (font D,
+# `^ADN,18,10`), asking for it 20% smaller. FONT D CANNOT BE MADE SMALLER: fixed-pitch
+# bitmap fonts do not go below their base size -- `^ADN,14,8` returns a render IDENTICAL to
+# `^ADN,18,10` (153x14 dots, measured in Labelary). The next step down within the family is
+# B, and that is where it went on 2026-08-05.
 #
-# EN PAPEL LA B QUEDO CHICA (2026-08-06). La tira que mando la tienda trae las dos: las dos
-# de abajo salieron con la escalable vieja y las dos de arriba con la B. Medido sobre la
-# foto contra el alto del precio, la B rinde 0,64 de esa referencia contra 0,80 de la
-# escalable -- o sea que al salir del empastado tambien se perdio cuerpo. La familia quedo
-# confirmada (la B se lee digito por digito donde la escalable montaba el "526"); lo que
-# faltaba era volver al tamano.
+# ON PAPER, B CAME OUT SMALL (2026-08-06). The strip the store sent carries both: the bottom
+# two printed with the old scalable font and the top two with B. Measured on the photo
+# against the height of the price, B yields 0.64 of that reference against the scalable
+# font's 0.80 -- so escaping the clogging also cost body. The family was confirmed (B reads
+# digit by digit where the scalable font ran the "526" together); what was missing was
+# getting the size back.
 #
-# LA D NO SIRVE, AUNQUE FUERA LA ELEGIDA: se probo (`^ADN,18,10`) y en el papel el SKU de
-# 15 caracteres termina en el dot 364 con el escalon paleta/cola en el 360 -- toca el
-# troquel. Y no es un caso raro: de 24.388 variantes con SKU en v19, el **51,5% tiene 15
-# caracteres** y el 43,6% tiene 13. El requisito de la tienda es que el SKU no toque el
-# troquelado de ningun lado, asi que la D queda descartada por ancho, no por dibujo.
+# FONT D IS NO GOOD, EVEN THOUGH IT WAS THE ONE CHOSEN: it was tried (`^ADN,18,10`) and on
+# paper a 15-character SKU ends at dot 364 with the paddle/tail step at 360 -- it touches
+# the die-cut. And that is not a rare case: of 24,388 variants with a SKU in v19, **51.5%
+# have 15 characters** and 43.6% have 13. The store's requirement is that the SKU touch the
+# die-cut on no side, so D is ruled out on width, not on shape.
 #
-# LA SALIDA: LAS BITMAP ESCALAN ALTO Y ANCHO POR SEPARADO. Medido en Labelary, `^ABN,22,7`
-# es la B con el ALTO duplicado y el ancho SIN tocar -- no es lo mismo que `^ABN,22,14`,
-# que duplica las dos cosas y se come la cola. Los multiplicadores son enteros y cada eje
-# va por su cuenta; un valor que no sea multiplo se redondea para abajo (`^ABN,16,7`
-# dibuja igual que `^ABN,11,7`).
+# THE WAY OUT: BITMAP FONTS SCALE HEIGHT AND WIDTH SEPARATELY. Measured in Labelary,
+# `^ABN,22,7` is font B with the HEIGHT doubled and the width UNTOUCHED -- which is not the
+# same as `^ABN,22,14`, that doubles both and eats into the tail. The multipliers are
+# integers and each axis goes its own way; a value that is not a multiple is rounded down
+# (`^ABN,16,7` draws exactly like `^ABN,11,7`).
 #
-#   fuente        alto de tinta   ancho 16 car.   termina en el dot
+#   font          ink height      width 16 char.  ends at dot
 #   B 11,7             11              142              329
-#   D 18,10            14              188              376   <- toca el escalon (360)
-#   B 22,7             22              142              329   <- 31 dots de aire
+#   D 18,10            14              188              376   <- hits the step (360)
+#   B 22,7             22              142              329   <- 31 dots of air
 #
-# O sea: mas alto que la D y con el ancho de la B. El costo es la proporcion -- los glifos
-# quedan estirados 2:1, altos y angostos. Es el precio de que entre siempre.
+# In other words: taller than D with the width of B. The cost is proportion -- the glyphs
+# come out stretched 2:1, tall and narrow. That is the price of always fitting.
 FONT_SKU = (22, 7)
 FONT_SKU_CMD = "ABN"
 
 FONT_DESC = (14, 8)
 FONT_PRICE = (24, 18)
 
-# EL PRECIO SE BAJA hasta apoyar contra el corte del troquel (pedido de Gabriel del
-# 2026-08-01, la marca verde sobre la foto). Ya no se cuelga del Y_BOT del lienzo: se
-# cuelga del PAPEL medido, que es el limite que importa. La marca verde de Gabriel arranca
-# en el dot 78 y este calculo cae exactamente ahi -- la marca y la medicion coinciden solas.
-PRICE_SAFETY = 5         # aire entre el pie del precio y el corte del troquel
+# THE PRICE DROPS until it rests against the die-cut (Gabriel's request of 2026-08-01, the
+# green mark on the photo). It no longer hangs off the canvas's Y_BOT but off the MEASURED
+# paper, which is the limit that matters. Gabriel's green mark starts at dot 78 and this
+# calculation lands exactly there -- mark and measurement agree on their own.
+PRICE_SAFETY = 5         # air between the foot of the price and the die-cut
 
 Y_SKU = Y_TOP + 2
 Y_PRICE = PAPER_CUT_DOTS - PRICE_SAFETY - FONT_PRICE[0]      # 78
 
-# LA DESCRIPCION SE CUELGA DE LA COLA, NO DEL HUECO (2026-08-06). Venia centrada en el
-# espacio libre entre el SKU y el precio, que es un criterio de la PALETA -- y la
-# descripcion es el unico campo que sale de la paleta y sigue sobre la cola. Con las dos
-# lineas de troquel de la cola ya medidas (dots 49 y 68), el centrado bueno es el de esa
-# ventana: asi el pedazo que queda afuera de la paleta cae dentro del recuadro en vez de
-# montarse sobre el corte.
+# THE DESCRIPTION HANGS OFF THE TAIL, NOT OFF THE GAP (2026-08-06). It used to be centred
+# in the free space between the SKU and the price, which is a PADDLE criterion -- and the
+# description is the one field that leaves the paddle and continues over the tail. With the
+# tail's two die lines now measured (dots 49 and 68), the right centring is that window's:
+# the part that falls outside the paddle then lands inside the box instead of riding over
+# the cut.
 #
-# Lo de antes dejaba la tinta en 49..59, o sea apoyada JUSTO sobre la linea de arriba: en
-# la foto del 06/08 se ve el troquel cruzando el texto de lado a lado. Centrada da 53..63,
-# con 4 dots de aire de cada lado.
+# The previous version left the ink at 49..59, resting RIGHT ON the upper line: the photo
+# of 06/08 shows the die-cut crossing the text end to end. Centred, it gives 53..63, with
+# 4 dots of air on each side.
 #
-# El cuerpo de la fuente no es el alto de la tinta: la `A0N,14,8` dibuja 11 dots y los
-# arranca UNO ARRIBA del ^FO (las dos cosas medidas en Labelary). Se centra la TINTA, que
-# es lo que se ve, y despues se convierte a coordenada de ^FO.
+# The font size is not the ink height: `A0N,14,8` draws 11 dots and starts them ONE DOT
+# ABOVE the ^FO (both measured in Labelary). What gets centred is the INK, which is what
+# you see, and only then is it converted to an ^FO coordinate.
 DESC_INK_H = 11
 DESC_INK_OFFSET = -1
 
-# DESC_NUDGE: el centro GEOMETRICO no es el que se ve centrado. Con la ventana en 51..71 el
-# calculo deja la tinta en 55..65 y sobre el papel se lee alta -- pedido de la tienda del
-# 2026-08-06: "que baje 2 dots". Coincide con la medicion: los picos de las dos lineas de
-# troquel salieron en {50, 51, 53} y {70, 72, 73}, o sea que la ventana real esta un par de
-# dots mas abajo que el punto medio de esos grupos. Se corrige con el corrimiento y no
-# cableando el valor, para no perder el centrado automatico si cambia la fuente.
+# DESC_NUDGE: the GEOMETRIC centre is not the one that reads as centred. With the window at
+# 51..71 the calculation leaves the ink at 55..65, and on paper that reads high -- store
+# request of 2026-08-06: "drop it 2 dots". It agrees with the measurement: the peaks of the
+# two die lines came out at {50, 51, 53} and {70, 72, 73}, so the real window sits a couple
+# of dots below the midpoint of those groups. Corrected with an offset rather than by
+# hard-coding the value, so the automatic centring survives a change of font.
 DESC_NUDGE = 2
 Y_DESC = (COLA_TOP_DOTS + (COLA_BOT_DOTS - COLA_TOP_DOTS - DESC_INK_H) // 2
           - DESC_INK_OFFSET + DESC_NUDGE)
 
 
 def _zpl_safe(text):
-    """`^` y `~` son los prefijos de comando de ZPL: en un ^FD parten la etiqueta."""
+    """`^` and `~` are ZPL command prefixes: inside an ^FD they break the label."""
     return (text or "").replace("^", " ").replace("~", " ")
 
 
 def _field(x, y, font, text, width, lines=1, align="L", cmd="A0N"):
-    """Un campo de texto.
+    """Un campo de text.
 
-    El ancho se resuelve con ^FB, o sea que lo ajusta LA IMPRESORA con la metrica real de
-    la fuente y cortando por palabra. No recortamos por cuenta propia: esa cuenta (una
-    estimacion de ancho por caracter) fue la que cortaba las fichas a mitad de palabra
-    -- "Box w/ Hi", "18k Black Rhodi".
+    The width is resolved with ^FB, meaning THE PRINTER fits it using the font's real
+    metrics and breaking on word boundaries. We do no trimming of our own: that arithmetic
+    - an estimated width per character - is exactly what used to cut the spec block off
+    mid-word -- "Box w/ Hi", "18k Black Rhodi".
 
-    `cmd` es la fuente. Por defecto la escalable `A0N`, que es la que usan la ficha, la
-    descripcion y el precio. Solo el SKU pasa otra (ver FONT_SKU_CMD): la escalable le
-    empasta los digitos.
+    `cmd` is the font. It defaults to the scalable `A0N`, used by the spec block, the
+    description and the price. Only the SKU passes something else (see FONT_SKU_CMD): the
+    scalable font clogs its digits.
     """
     if not text:
         return ""
@@ -326,23 +327,23 @@ class ProductProduct(models.Model):
     _inherit = "product.product"
 
     def _get_attribute_map(self):
-        """Atributos de la pieza, combinando template y variante.
+        """The piece's attributes, combining template and variant.
 
-        Los datos gemologicos (carat, clarity, color, origin, shape) estan
-        configurados como `no_variant`: Odoo los deja en la linea del template
-        y NUNCA los cuelga de `product_template_attribute_value_ids`. Leer solo
-        la variante devolvia la etiqueta sin la ficha de la piedra.
+        The gemological data (carat, clarity, color, origin, shape) is configured as
+        `no_variant`: Odoo leaves it on the template's line and NEVER hangs it off
+        `product_template_attribute_value_ids`. Reading the variant alone returned a tag
+        with no stone spec at all.
 
-        Del template se toman unicamente las lineas de UN solo valor: si tiene
-        varios (ej. Material = White/Rose/Yellow Gold) es un atributo que genera
-        variantes, y el valor que corresponde a esta pieza lo aporta la variante.
+        Only single-valued lines are taken from the template: when a line holds several
+        values (Material = White/Rose/Yellow Gold, say) it is a variant-generating
+        attribute, and the value for this particular piece comes from the variant.
         """
         self.ensure_one()
         vals = {}
         for line in self.product_tmpl_id.attribute_line_ids:
             if len(line.value_ids) == 1:
                 vals[line.attribute_id.name] = line.value_ids.name
-        # La variante manda: pisa al template donde tenga valor propio.
+        # The variant wins: it overrides the template wherever it has a value of its own.
         for ptav in self.product_template_attribute_value_ids:
             vals[ptav.attribute_id.name] = ptav.name
         return vals
@@ -362,18 +363,18 @@ class ProductProduct(models.Model):
         return {}
 
     def _first_of(self, attr_map, candidates):
-        """Primer atributo de la cascada que tenga valor cargado."""
+        """The first attribute in the cascade that carries a value."""
         for name in candidates:
             if attr_map.get(name):
                 return attr_map[name]
         return ""
 
     def _get_label_cells(self):
-        """Los valores de la ficha SUELTOS, uno por celda de la tabla.
+        """The spec values BROKEN OUT, one per table cell.
 
-        El layout en ranura fija necesita cada dato por separado para poder darle su
-        posicion reservada; el renglon corrido del layout anterior (piedra | aleacion |
-        medida, todo concatenado) no servia para esto.
+        The fixed-slot layout needs every datum separately so it can be given its reserved
+        position; the running line of the previous layout (stone | alloy | measurement, all
+        concatenated) was no use for that.
         """
         self.ensure_one()
         attr_map = self._get_attribute_map()
@@ -410,21 +411,20 @@ class ProductProduct(models.Model):
         zpl.append("^XZ")
         return "".join(zpl)
 
-    # --- VISTA PREVIA EN EL CHATTER -----------------------------------------
-    # Lo que se imprime se registra en el chatter de la variante con la imagen de la
-    # etiqueta SOBRE EL TROQUEL. Sin el troquel dibujado la imagen enganha: el render
-    # crudo del ZPL muestra un lienzo de 112 dots que no existe en el papel, no dice
-    # donde cae el corte ni donde se dobla el tag, y son justo los dos limites contra
-    # los que se valida un layout.
+    # --- CHATTER PREVIEW ----------------------------------------------------
+# Every print is recorded in the variant's chatter with the tag drawn OVER THE DIE-CUT.
+# Without the die-cut drawn in, the image misleads: the raw ZPL render shows a 112-dot
+# canvas that does not exist on paper, says nothing about where the cut falls or where the
+# tag folds - and those are precisely the two limits a layout is validated against.
 
     LABELARY_URL = "http://api.labelary.com/v1/printers/8dpmm/labels/3.5x0.55/0/"
-    PREVIEW_SCALE = 4          # 1 px por dot es ilegible en pantalla; 4x da 2840x508
-    PREVIEW_LEGEND_H = 108     # banda de abajo para los rotulos
+    PREVIEW_SCALE = 4          # 1 px per dot is unreadable on screen; 4x gives 2840x508
+    PREVIEW_LEGEND_H = 108     # bottom band for the legend
 
     def _legend_font(self):
-        """La fuente por defecto de PIL mide 11px y sobre un lienzo de 2840 no se lee. Se
-        usa DejaVu, que esta en la imagen de Odoo.sh (verificado), con fallback por si
-        manana no esta: la vista previa no puede caerse por una tipografia."""
+        """PIL's default font is 11px and is unreadable on a 2840-wide canvas. DejaVu is
+        used instead - it ships in the Odoo.sh image, verified - with a fallback in case it
+        is gone tomorrow: the preview must not fall over because of a typeface."""
         from PIL import ImageFont
         for ruta in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                      "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf"):
@@ -435,104 +435,106 @@ class ProductProduct(models.Model):
         return ImageFont.load_default()
 
     def _labelary_png(self, zpl):
-        """Rasteriza el ZPL con Labelary: es un interprete ZPL real, asi que el PNG es
-        lo que sale por la Zebra y no una aproximacion nuestra. Devuelve None si el
-        servicio no responde -- el registro de la impresion no depende de la imagen."""
+        """Rasterize the ZPL with Labelary: it is a real ZPL interpreter, so the PNG is
+        what the Zebra will put out rather than an approximation of ours. Returns None when
+        the service does not answer -- recording the print does not depend on the image."""
         try:
             r = requests.post(self.LABELARY_URL, data=zpl.encode("utf8"), timeout=10)
             r.raise_for_status()
             return r.content
         except Exception as e:
-            _logger.warning("Labelary no pudo rasterizar la etiqueta: %s", e)
+            _logger.warning("Labelary could not rasterize the tag: %s", e)
             return None
 
     def _draw_die_cut(self, png_bytes):
-        """Pega el render sobre el papel REAL y le dibuja el troquel encima.
+        """Paste the render onto the REAL paper and draw the die-cut over it.
 
-        El render viene con el lienzo del ZPL (y=0..111). El papel no coincide: arranca
-        en el dot -20 (esa franja existe pero el cabezal no la alcanza) y el corte cae
-        en el +107. Por eso el render se corta en 107 y se pega 20 dots mas abajo: asi
-        las coordenadas de la imagen son las del PAPEL, no las del lienzo.
+        The render comes with the ZPL canvas (y=0..111). The paper does not line up:
+        it starts at dot -20 (that strip exists but the printhead cannot reach it) and
+        the cut falls at +107. So the render is clipped at 107 and pasted 20 dots
+        lower, which makes the image's coordinates those of the PAPER, not of the
+        canvas.
 
-        Codigo de color daltonico-seguro (azul/naranja, nunca verde/rojo): AZUL el borde
-        del troquel y la costura de la cola, NARANJA el pliegue -- que es el unico limite
-        que rompe el texto en dos caras y conviene que salte a la vista.
+        Colour-blind-safe coding (blue/orange, never green/red): BLUE for the die-cut
+        edge and the tail seam, ORANGE for the fold -- the one limit that splits text
+        across two faces, and the one worth making obvious.
         """
         render = Image.open(io.BytesIO(png_bytes)).convert("L")
-        alto_papel = PAPER_CUT_DOTS - PAPER_TOP_DOTS          # 127
-        desplaz = -PAPER_TOP_DOTS                             # 20
+        paper_h = PAPER_CUT_DOTS - PAPER_TOP_DOTS          # 127
+        offset = -PAPER_TOP_DOTS                             # 20
 
-        papel = Image.new("L", (CANVAS_WIDTH_DOTS, alto_papel), 255)
-        papel.paste(render.crop((0, 0, CANVAS_WIDTH_DOTS,
-                                 min(PAPER_CUT_DOTS, render.height))), (0, desplaz))
+        paper = Image.new("L", (CANVAS_WIDTH_DOTS, paper_h), 255)
+        paper.paste(render.crop((0, 0, CANVAS_WIDTH_DOTS,
+                                 min(PAPER_CUT_DOTS, render.height))), (0, offset))
 
         s = self.PREVIEW_SCALE
-        # NEAREST y no bicubico: cada dot tiene que verse como el cuadrado que es. Suavizar
-        # la escala inventa grises y hace parecer legible un texto que en el papel no lo es.
-        out = papel.resize((CANVAS_WIDTH_DOTS * s, alto_papel * s),
+            # NEAREST, not bicubic: every dot has to look like the square it is.
+            # Smoothing the scale invents greys and makes text look legible that on
+            # paper is not.
+        out = paper.resize((CANVAS_WIDTH_DOTS * s, paper_h * s),
                            Image.NEAREST).convert("RGB")
-        lienzo = Image.new("RGB", (out.width, out.height + self.PREVIEW_LEGEND_H), "white")
-        lienzo.paste(out, (0, 0))
-        d = ImageDraw.Draw(lienzo)
+        canvas = Image.new("RGB", (out.width, out.height + self.PREVIEW_LEGEND_H), "white")
+        canvas.paste(out, (0, 0))
+        d = ImageDraw.Draw(canvas)
 
-        AZUL, NARANJA, GRIS = (0, 82, 155), (214, 106, 0), (150, 150, 150)
+        BLUE, ORANGE, GREY = (0, 82, 155), (214, 106, 0), (150, 150, 150)
 
-        # Franja de arriba que el cabezal no alcanza: se raya para que no se confunda con
-        # papel util. Es de donde salio el "esta impreso muy alto" que la tienda veia.
-        for x in range(0, lienzo.width, 12):
-            d.line([(x, 0), (x + desplaz * s, desplaz * s)], fill=GRIS, width=1)
-        d.line([(0, desplaz * s), (lienzo.width, desplaz * s)], fill=GRIS, width=2)
+            # The top strip the printhead cannot reach, hatched so it is not mistaken
+            # for usable paper. It is where the store's "it prints too high" came from.
+        for x in range(0, canvas.width, 12):
+            d.line([(x, 0), (x + offset * s, offset * s)], fill=GREY, width=1)
+        d.line([(0, offset * s), (canvas.width, offset * s)], fill=GREY, width=2)
 
-        d.rectangle([(0, 0), (out.width - 1, out.height - 1)], outline=AZUL, width=3)
+        d.rectangle([(0, 0), (out.width - 1, out.height - 1)], outline=BLUE, width=3)
 
-        for x_dot, color, ancho in ((FOLD_DOTS, NARANJA, 3),
-                                    (CONTENT_WIDTH_DOTS, AZUL, 2)):
+        for x_dot, color, width in ((FOLD_DOTS, ORANGE, 3),
+                                    (CONTENT_WIDTH_DOTS, BLUE, 2)):
             x = x_dot * s
-            for y in range(0, out.height, 16):     # punteada: no tapa lo que hay debajo
-                d.line([(x, y), (x, y + 8)], fill=color, width=ancho)
+            for y in range(0, out.height, 16):     # dashed, so it does not hide what is underneath
+                d.line([(x, y), (x, y + 8)], fill=color, width=width)
 
-        fuente = self._legend_font()
+        font = self._legend_font()
         base = out.height + 10
-        for i, (texto, color) in enumerate((
+        for i, (text, color) in enumerate((
             ("BLUE: die-cut edge (cut at dot %d) and hang-tail seam (dot %d, which rolls "
              "up and stays hidden)"
-             % (PAPER_CUT_DOTS, CONTENT_WIDTH_DOTS), AZUL),
+             % (PAPER_CUT_DOTS, CONTENT_WIDTH_DOTS), BLUE),
             ("ORANGE: fold line (dot %d) -- anything crossing it is split between the "
-             "two faces of the tag" % FOLD_DOTS, NARANJA),
+             "two faces of the tag" % FOLD_DOTS, ORANGE),
             ("HATCHED: the %d dots of paper the printhead cannot reach (they start "
-             "above y=0)" % desplaz, GRIS),
+             "above y=0)" % offset, GREY),
         )):
-            d.text((10, base + i * 32), texto, fill=color, font=fuente)
+            d.text((10, base + i * 32), text, fill=color, font=font)
 
         buf = io.BytesIO()
-        lienzo.save(buf, format="PNG")
+        canvas.save(buf, format="PNG")
         return buf.getvalue()
 
     def _label_preview_attachment(self, zpl):
-        """Adjunto de la vista previa, cacheado por hash del ZPL: mientras la etiqueta no
-        cambie no se vuelve a pedir el render, aunque se imprima diez veces."""
+        """The preview attachment, cached by the ZPL hash: as long as the tag does not
+        change the render is not requested again, even if it is printed ten times."""
         self.ensure_one()
-        firma = hashlib.sha256(zpl.encode("utf8")).hexdigest()[:12]
-        nombre = "tag_%s_%s.png" % (self.default_code or self.id, firma)
+        digest = hashlib.sha256(zpl.encode("utf8")).hexdigest()[:12]
+        fname = "tag_%s_%s.png" % (self.default_code or self.id, digest)
         Att = self.env["ir.attachment"]
         att = Att.search([("res_model", "=", "product.product"),
-                          ("res_id", "=", self.id), ("name", "=", nombre)], limit=1)
+                          ("res_id", "=", self.id), ("name", "=", fname)], limit=1)
         if att:
             return att
-        crudo = self._labelary_png(zpl)
-        if not crudo:
+        raw = self._labelary_png(zpl)
+        if not raw:
             return Att
         return Att.create({
-            "name": nombre,
+            "name": fname,
             "res_model": "product.product",
             "res_id": self.id,
             "mimetype": "image/png",
-            "datas": base64.b64encode(self._draw_die_cut(crudo)),
+            "datas": base64.b64encode(self._draw_die_cut(raw)),
         })
 
     def action_log_printed_label(self):
-        """La llama el boton DESPUES de que el bridge confirmo la impresion. Se postea lo
-        que efectivamente salio en papel; los intentos fallidos no ensucian el chatter."""
+        """Called by the button AFTER the bridge has confirmed the print. What gets posted
+        is what actually came out on paper; failed attempts do not clutter the chatter."""
         self.ensure_one()
         zpl = self.get_jewelry_label_zpl()
         att = self._label_preview_attachment(zpl)

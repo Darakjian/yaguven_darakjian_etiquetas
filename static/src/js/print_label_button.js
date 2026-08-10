@@ -6,9 +6,9 @@ import { Component, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 // 127.0.0.1 y NO "localhost": en macOS "localhost" resuelve primero a ::1 (IPv6) y el
-// bridge escucha solo en IPv4 (`ZBRIDGE_LISTEN_HOST` por defecto en 127.0.0.1). Verificado
-// en el iMac de la tienda: por 127.0.0.1 responde 200, por [::1] no responde nada. curl
-// disimula el problema porque reintenta con IPv4; el navegador no siempre lo hace, y el
+// bridge only listens on IPv4 (`ZBRIDGE_LISTEN_HOST` defaults to 127.0.0.1). Verified on
+// the store's iMac: 127.0.0.1 answers 200, [::1] answers nothing at all. curl hides the
+// problem because it retries over IPv4; the browser does not always do that, and the
 // sintoma es un "Failed to fetch" pelado que no dice de que se trata.
 const BRIDGE_URL = "http://127.0.0.1:9199/write";
 
@@ -45,19 +45,20 @@ class PrintJewelryLabelButton extends Component {
             this.notification.add(_t("Tag sent to the Zebra printer"), {
                 type: "success",
             });
-            // El registro en el chatter va DESPUES del OK del bridge: lo que queda
-            // asentado es lo que efectivamente salio en papel, no cada intento. Y va
-            // en su propio try: si el chatter falla, la etiqueta ya se imprimio igual
-            // y decirle al usuario que no se imprimio seria mentirle.
+            // The chatter entry goes AFTER the bridge says OK: what gets recorded is what
+            // actually came out on paper, not every attempt. And it sits in its own try:
+            // if the chatter fails the tag was printed all the same, and telling the user
+            // it was not would be a lie.
             try {
                 await this.orm.call(
                     "product.product",
                     "action_log_printed_label",
                     [[resId]]
                 );
-                // Refrescar es cosmetico (que el mensaje aparezca sin recargar a mano) y
-                // la API de recarga cambia entre versiones: si falla, se traga el error.
-                // El mensaje ya esta posteado; avisar de un problema aca seria confundir.
+                // Refreshing is cosmetic - it just saves a manual reload to see the
+                // message - and the reload API changes between versions, so a failure is
+                // swallowed. The message is already posted; reporting a problem here
+                // would only confuse.
                 try {
                     await this.props.record.load();
                 } catch {

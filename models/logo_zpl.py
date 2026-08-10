@@ -1,29 +1,28 @@
-"""Wordmark "DARAKJIAN" del logo de la compania, ya rasterizado a ZPL.
+"""The company wordmark "DARAKJIAN", pre-rasterized to ZPL.
 
-Pre-convertido para no depender de PIL ni de leer res.company en cada impresion.
-Regenerar si cambia el logo: bajar el PNG de `res.company.logo` y componerlo
-sobre fondo BLANCO (es RGBA y la termica no imprime transparencia).
+Converted ahead of time so printing depends on neither PIL nor a read of res.company.
+Regenerate it if the logo changes: pull the PNG from `res.company.logo` and compose it
+over a WHITE background (it is RGBA, and a thermal printer cannot print transparency).
 
-COMO SE AISLA EL WORDMARK (lo que costo dos intentos): el subtitulo "JEWELERS"
-NO se separa cortando a una altura fija, porque **se solapa verticalmente** con
-el wordmark -- en el PNG de 640x118 el wordmark ocupa y=12..93 y el subtitulo
-y=85..105. Cortar por porcentaje se come el descendente de la "J" y la marca
-sale partida abajo. Tampoco alcanza con blanquear "de tal fila para abajo" a la
-derecha: esa franja todavia contiene las letras finales del wordmark. El
-criterio correcto:
-  1. filas donde hay tinta SOLO a la derecha -> ahi vive el subtitulo puro
-     (y=94..105), y de ahi sale la x donde arranca (x=438);
-  2. blanquear el rectangulo x>=438, y>=85 -- el 85 es donde el subtitulo
-     empieza a solaparse con el descendente de la J;
-  3. recien entonces sacar el bbox -> wordmark aislado 619x82.
+HOW THE WORDMARK IS ISOLATED (this took two attempts): the "JEWELERS" subtitle canNOT be
+separated by cutting at a fixed height, because it OVERLAPS the wordmark vertically -- in
+the 640x118 PNG the wordmark occupies y=12..93 and the subtitle y=85..105. Cutting by
+percentage eats the descender of the "J" and the mark comes out clipped at the bottom.
+Nor is it enough to whiten "from row N downward" on the right: that band still holds the
+last letters of the wordmark. The criterion that works:
+  1. find the rows carrying ink ONLY on the right -> that is where the subtitle lives
+     alone (y=94..105), and that gives the x where it starts (x=438);
+  2. whiten the rectangle x>=438, y>=85 -- 85 being where the subtitle starts to overlap
+     the descender of the J;
+  3. only then take the bbox -> the wordmark isolated at 619x82.
 
-Se descarta el subtitulo porque a la altura que entra en esta etiqueta cae a
-~3 dots y es ilegible: es el DPI de la impresora (203), no la resolucion del
-archivo (el logo de darakjian.com es el mismo PNG de 640x118).
+The subtitle is dropped because at the height it would occupy on this tag it lands at
+~3 dots and is unreadable. That is the printer's DPI (203) talking, not the resolution of
+the file (the logo on darakjian.com is the same 640x118 PNG).
 
-Medidas: 100x13 dots @203dpi. Antes eran 150x19, cuando el wordmark ocupaba
-una linea entera abajo a la derecha; con el layout en bandas pasa a la banda
-superior, al lado del SKU y del precio, y a ese tamano sigue legible.
+Dimensions: 100x13 dots @203dpi. They used to be 150x19, back when the wordmark took a
+whole line of its own at the bottom right; with the banded layout it moved up to the top
+band, beside the SKU and the price, and it stays legible at that size.
 """
 
 LOGO_W = 100

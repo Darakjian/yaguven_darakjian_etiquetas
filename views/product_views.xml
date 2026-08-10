@@ -10,11 +10,12 @@
                     <widget name="print_jewelry_label" string="Print Tag"/>
                 </header>
             </xpath>
-            <!-- NO agregar <chatter/> aca: la ficha de variante YA lo trae de la vista
-                 nativa. Se agrego el 2026-08-03 y salio DUPLICADO en pantalla. El chequeo
-                 previo dio un falso negativo por buscar "Chatter"/"oe_chatter" en el arch
-                 cuando el tag real es "<chatter/>" en minuscula. Para verificar si una
-                 vista tiene chatter, buscar el tag en minuscula. -->
+            <!-- Do NOT add <chatter/> here: the variant form ALREADY inherits one from
+                 the native view. It was added on 2026-08-03 and showed up DUPLICATED on
+                 screen. The check beforehand gave a false negative because it searched
+                 the arch for "Chatter"/"oe_chatter" when the real tag is lowercase
+                 "<chatter/>". To check whether a view has a chatter, search for the
+                 lowercase tag. -->
         </field>
     </record>
 </odoo>
