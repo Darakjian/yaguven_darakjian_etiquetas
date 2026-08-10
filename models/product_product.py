@@ -7,7 +7,7 @@ import requests
 from markupsafe import Markup
 from PIL import Image, ImageDraw
 
-from odoo import models
+from odoo import _, models
 from odoo.tools.misc import html_escape
 
 _logger = logging.getLogger(__name__)
@@ -494,13 +494,13 @@ class ProductProduct(models.Model):
         fuente = self._legend_font()
         base = out.height + 10
         for i, (texto, color) in enumerate((
-            ("AZUL: borde del troquel (corte en el dot %d) y costura de la cola de "
-             "enganche (dot %d, se enrolla y queda oculta)"
+            ("BLUE: die-cut edge (cut at dot %d) and hang-tail seam (dot %d, which rolls "
+             "up and stays hidden)"
              % (PAPER_CUT_DOTS, CONTENT_WIDTH_DOTS), AZUL),
-            ("NARANJA: linea de plegado (dot %d) -- lo que la cruza se parte entre las "
-             "dos caras del tag" % FOLD_DOTS, NARANJA),
-            ("RAYADO: los %d dots de papel que el cabezal no alcanza (arrancan antes "
-             "del y=0)" % desplaz, GRIS),
+            ("ORANGE: fold line (dot %d) -- anything crossing it is split between the "
+             "two faces of the tag" % FOLD_DOTS, NARANJA),
+            ("HATCHED: the %d dots of paper the printhead cannot reach (they start "
+             "above y=0)" % desplaz, GRIS),
         )):
             d.text((10, base + i * 32), texto, fill=color, font=fuente)
 
@@ -513,7 +513,7 @@ class ProductProduct(models.Model):
         cambie no se vuelve a pedir el render, aunque se imprima diez veces."""
         self.ensure_one()
         firma = hashlib.sha256(zpl.encode("utf8")).hexdigest()[:12]
-        nombre = "etiqueta_%s_%s.png" % (self.default_code or self.id, firma)
+        nombre = "tag_%s_%s.png" % (self.default_code or self.id, firma)
         Att = self.env["ir.attachment"]
         att = Att.search([("res_model", "=", "product.product"),
                           ("res_id", "=", self.id), ("name", "=", nombre)], limit=1)
@@ -537,11 +537,13 @@ class ProductProduct(models.Model):
         zpl = self.get_jewelry_label_zpl()
         att = self._label_preview_attachment(zpl)
 
-        cuerpo = "<p><strong>Tag printed</strong> &mdash; %s</p>" % html_escape(
-            self.default_code or self.display_name)
+        cuerpo = "<p><strong>%s</strong> &mdash; %s</p>" % (
+            html_escape(_("Tag printed")),
+            html_escape(self.default_code or self.display_name))
         if not att:
-            cuerpo += ("<p>La etiqueta salio por la impresora, pero no se pudo generar la "
-                       "vista previa (el render no respondio).</p>")
+            cuerpo += "<p>%s</p>" % html_escape(_(
+                "The tag came out of the printer, but the preview could not be built "
+                "(the rendering service did not answer)."))
         self.message_post(
             body=Markup(cuerpo),
             message_type="comment",

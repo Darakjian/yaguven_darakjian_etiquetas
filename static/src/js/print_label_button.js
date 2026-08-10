@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
+import { _t } from "@web/core/l10n/translation";
 import { Component, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
@@ -41,7 +42,7 @@ class PrintJewelryLabelButton extends Component {
             if (!response.ok) {
                 throw new Error(await response.text());
             }
-            this.notification.add("Tag sent to the Zebra printer", {
+            this.notification.add(_t("Tag sent to the Zebra printer"), {
                 type: "success",
             });
             // El registro en el chatter va DESPUES del OK del bridge: lo que queda
@@ -64,12 +65,12 @@ class PrintJewelryLabelButton extends Component {
                 }
             } catch (error) {
                 this.notification.add(
-                    "Printed, but the preview could not be logged: " + error.message,
+                    _t("Printed, but the preview could not be logged: %s", error.message),
                     { type: "warning" }
                 );
             }
         } catch (error) {
-            this.notification.add("Could not print: " + error.message, {
+            this.notification.add(_t("Could not print: %s", error.message), {
                 type: "danger",
             });
         } finally {
