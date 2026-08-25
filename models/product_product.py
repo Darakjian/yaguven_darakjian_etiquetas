@@ -7,7 +7,7 @@ import requests
 from markupsafe import Markup
 from PIL import Image, ImageDraw
 
-from odoo import _, models
+from odoo import _, api, fields, models
 from odoo.tools.misc import html_escape
 
 _logger = logging.getLogger(__name__)
@@ -326,6 +326,26 @@ def _field(x, y, font, text, width, lines=1, align="L", cmd="A0N"):
 class ProductProduct(models.Model):
     _inherit = "product.product"
 
+    # --- THE TAG'S VALUES, ON SCREEN ----------------------------------------
+    # The eight cells of the spec block, exposed as fields so the store can read on the
+    # form what is going to come out on paper without having to print a tag to find out.
+    #
+    # They are computed FROM `_get_label_cells()`, never from a second copy of the rules:
+    # the abbreviated metal, the stone family that won the priority list, the first
+    # measurement in the cascade. One source, so the tab cannot drift away from the tag.
+    #
+    # NOT STORED: they are a projection of attributes that already live in the database.
+    # Storing them would mean keeping them in step with every attribute edit for no gain,
+    # since they are only ever read one record at a time, on this form.
+    label_carat_qty = fields.Char("Carat / Qty", compute="_compute_label_cells")
+    label_clarity = fields.Char("Clarity", compute="_compute_label_cells")
+    label_color = fields.Char("Color", compute="_compute_label_cells")
+    label_origin = fields.Char("Origin", compute="_compute_label_cells")
+    label_clasp = fields.Char("Clasp", compute="_compute_label_cells")
+    label_measure = fields.Char("Measure", compute="_compute_label_cells")
+    label_karatage = fields.Char("Karatage", compute="_compute_label_cells")
+    label_metal = fields.Char("Metal", compute="_compute_label_cells")
+
     def _get_attribute_map(self):
         """The piece's attributes, combining template and variant.
 
@@ -393,6 +413,23 @@ class ProductProduct(models.Model):
             "measure": self._first_of(attr_map, MEASURE_ATTRS),
             "clasp": self._first_of(attr_map, CLASP_ATTRS),
         }
+
+    @api.depends("product_template_attribute_value_ids",
+                 "product_tmpl_id.attribute_line_ids.value_ids")
+    def _compute_label_cells(self):
+        """Each cell to its own field, straight off the same dictionary the tag is built
+        from. An empty cell stays empty here too -- that is the fixed-slot rule of the
+        layout, and hiding it on screen would misrepresent the tag."""
+        for record in self:
+            cells = record._get_label_cells()
+            record.label_carat_qty = cells["carat_qty"]
+            record.label_clarity = cells["clarity"]
+            record.label_color = cells["color"]
+            record.label_origin = cells["origin"]
+            record.label_clasp = cells["clasp"]
+            record.label_measure = cells["measure"]
+            record.label_karatage = cells["karatage"]
+            record.label_metal = cells["metal"]
 
     def get_jewelry_label_zpl(self):
         self.ensure_one()
