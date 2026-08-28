@@ -46,7 +46,11 @@ QUANTITY_ATTR_OVERRIDE = {
 # Fallback cascades: the first one carrying a value is the one printed. These attributes
 # are mutually exclusive by piece type - a ring has a Ring Size, a necklace has a Length -
 # which is why no single one of them is enough on its own.
+# `Case Diameter` added on 2026-08-28: a watch calls its measurement that, and the tag
+# was printing nothing in the Measure cell for the entire Watches branch. Reported by
+# Gabriel from the counter -- Armen had pieces whose tag showed a single attribute.
 MEASURE_ATTRS = ["Ring Size", "Length", "Drop Length", "Width", "Diameter",
+                 "Case Diameter",
                  "Shank Width (M)", "Bracelet/Strap Length", "Gram Weight"]
 CLASP_ATTRS = ["Clasp", "Earring Back", "Case Back"]
 
@@ -399,7 +403,11 @@ class ProductProduct(models.Model):
         self.ensure_one()
         attr_map = self._get_attribute_map()
         specs = self._get_stone_specs(attr_map)
-        metal = attr_map.get("Material") or attr_map.get("Primary Color", "")
+        # `Case Material` is the watch's way of saying Material. Same cause as
+        # `Case Diameter` above: the slot exists, the attribute is loaded, and the tag
+        # simply was not looking for that name.
+        metal = (attr_map.get("Material") or attr_map.get("Case Material")
+                 or attr_map.get("Primary Color", ""))
         carat = specs.get("carat", "")
         quantity = specs.get("quantity", "")
         return {
