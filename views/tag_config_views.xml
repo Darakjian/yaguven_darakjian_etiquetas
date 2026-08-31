@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!-- The setup lives on the category because the product already carries its categ_id:
+       nobody has to tag a piece with its family by hand. -->
+  <record id="view_product_category_tag_form" model="ir.ui.view">
+    <field name="name">product.category.form.tag</field>
+    <field name="model">product.category</field>
+    <field name="inherit_id" ref="product.product_category_form_view"/>
+    <field name="arch" type="xml">
+      <xpath expr="//sheet" position="inside">
+        <notebook>
+          <page string="Tag" name="yag_tag">
+            <div class="alert alert-info" role="alert">
+              What a piece of this family prints on its Zebra tag. The cardboard is
+              die-cut: there are eight cells and no more, one attribute each, and an
+              empty cell prints empty -- nothing moves up to fill a gap.
+              <br/>
+              Leave the cell empty for an attribute that should be loaded but not printed.
+              <br/>
+              A category with no setup of its own follows its parent branch.
+            </div>
+            <group>
+              <field name="yag_tag_heredada_de" readonly="1"
+                     invisible="not yag_tag_heredada_de"/>
+              <field name="yag_tag_lineas" readonly="1"/>
+            </group>
+            <field name="yag_tag_line_ids">
+              <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="attribute_id"/>
+                <field name="slot"/>
+                <field name="create_variant" optional="show"/>
+                <field name="admite_varios"/>
+                <field name="obligatorio"/>
+              </list>
+            </field>
+          </page>
+        </notebook>
+      </xpath>
+    </field>
+  </record>
+
+  <!-- Seeing at a glance which branches are already set up -->
+  <record id="view_product_category_tag_list" model="ir.ui.view">
+    <field name="name">product.category.list.tag</field>
+    <field name="model">product.category</field>
+    <field name="inherit_id" ref="product.product_category_list_view"/>
+    <field name="arch" type="xml">
+      <field name="display_name" position="after">
+        <field name="yag_tag_lineas" string="Tag attributes" optional="show"/>
+        <field name="yag_tag_heredada_de" string="Inherits from" optional="show"/>
+      </field>
+    </field>
+  </record>
+
+</odoo>
