@@ -54,6 +54,37 @@ MEASURE_ATTRS = ["Ring Size", "Length", "Drop Length", "Width", "Diameter",
                  "Shank Width (M)", "Bracelet/Strap Length", "Gram Weight"]
 CLASP_ATTRS = ["Clasp", "Earring Back", "Case Back"]
 
+# PER-FAMILY SLOTS (2026-08-31). The eight cells were laid out for a ring with stones:
+# carat, clarity, colour, diamond origin. A watch has none of those, so four cells printed
+# blank for the whole branch WHILE the data a watch does carry -- dial colour, movement,
+# what it is worn on -- had nowhere to go. Measured over the 2,921 watch templates: with
+# the jewellery slots only 3 watches print four cells or more; with the slots below, 419
+# do, and 155 of them print seven of the eight. No data is loaded to get that: it is the
+# same attributes, read into cells that mean something for a watch.
+#
+# The grid does not move. What changes is WHICH attribute owns each cell, decided by the
+# product's category. A family with no entry here keeps the jewellery slots, so nothing
+# that works today can break: the mapping is additive.
+FAMILY_SLOTS = {
+    "watches": {
+        # cell        candidates, first one carrying a value wins
+        "carat_qty": ["Movement"],
+        "clarity":   ["Bracelet/Strap Material"],
+        "color":     ["Dial Color"],
+        "origin":    ["Bracelet/Strap"],
+    },
+}
+# How a piece is placed in a family: by its category path, longest match first so a more
+# specific rule could be added later without reordering the dictionary.
+FAMILY_BY_CATEGORY = {
+    "Watch": "watches",
+}
+# The captions the screen prints for each cell, to explain a reuse in the words the user
+# is reading on the form.
+CELL_CAPTION = {"carat_qty": "Carat / Qty", "clarity": "Clarity", "color": "Color",
+                "origin": "Origin", "clasp": "Clasp", "measure": "Measure",
+                "karatage": "Karatage", "metal": "Metal"}
+
 # The metal goes abbreviated, matching the tag the store already uses ("YG").
 METAL_ABBR = {
     "White Gold": "WG", "Yellow Gold": "YG", "Rose Gold": "RG",
@@ -349,6 +380,11 @@ class ProductProduct(models.Model):
     label_measure = fields.Char("Measure", compute="_compute_label_cells")
     label_karatage = fields.Char("Karatage", compute="_compute_label_cells")
     label_metal = fields.Char("Metal", compute="_compute_label_cells")
+    # The printed tag carries no captions -- only values at fixed spots -- so a family
+    # that reuses a cell prints correctly. This screen DOES caption them, and would read
+    # "Clarity: Stainless Steel" on a watch. This line says what each reused cell is
+    # actually showing, so nobody has to guess.
+    label_slots_note = fields.Char(compute="_compute_label_cells")
 
     def _get_attribute_map(self):
         """The piece's attributes, combining template and variant.
@@ -371,6 +407,19 @@ class ProductProduct(models.Model):
         for ptav in self.product_template_attribute_value_ids:
             vals[ptav.attribute_id.name] = ptav.name
         return vals
+
+    def _get_family_slots(self):
+        """The cell mapping this piece's family uses, or None to keep the jewellery one.
+
+        Read off the category path so a piece follows its family without anyone tagging it
+        by hand: `Merch / Watches / ...` is a watch, and so is `Watch Straps`.
+        """
+        self.ensure_one()
+        path = self.categ_id.complete_name or ""
+        for token, family in FAMILY_BY_CATEGORY.items():
+            if token in path:
+                return FAMILY_SLOTS.get(family)
+        return None
 
     def _get_stone_specs(self, attr_map):
         for family in STONE_FAMILIES:
@@ -403,6 +452,7 @@ class ProductProduct(models.Model):
         self.ensure_one()
         attr_map = self._get_attribute_map()
         specs = self._get_stone_specs(attr_map)
+
         # `Case Material` is the watch's way of saying Material. Same cause as
         # `Case Diameter` above: the slot exists, the attribute is loaded, and the tag
         # simply was not looking for that name.
@@ -410,7 +460,7 @@ class ProductProduct(models.Model):
                  or attr_map.get("Primary Color", ""))
         carat = specs.get("carat", "")
         quantity = specs.get("quantity", "")
-        return {
+        cells = {
             "carat_qty": carat + ((" x%s" % quantity) if carat and quantity else ""),
             "clarity": specs.get("clarity", ""),
             "color": specs.get("color", ""),
@@ -421,9 +471,19 @@ class ProductProduct(models.Model):
             "measure": self._first_of(attr_map, MEASURE_ATTRS),
             "clasp": self._first_of(attr_map, CLASP_ATTRS),
         }
+        # The family, if it has its own slots, redefines what some cells hold. It is
+        # applied LAST and only where it finds a value, so a piece that does carry the
+        # jewellery datum keeps it: the family adds, it never blanks a cell that had
+        # something in it.
+        for cell, candidates in (self._get_family_slots() or {}).items():
+            value = self._first_of(attr_map, candidates)
+            if value:
+                cells[cell] = value
+        return cells
 
     @api.depends("product_template_attribute_value_ids",
-                 "product_tmpl_id.attribute_line_ids.value_ids")
+                 "product_tmpl_id.attribute_line_ids.value_ids",
+                 "categ_id")
     def _compute_label_cells(self):
         """Each cell to its own field, straight off the same dictionary the tag is built
         from. An empty cell stays empty here too -- that is the fixed-slot rule of the
@@ -438,6 +498,12 @@ class ProductProduct(models.Model):
             record.label_measure = cells["measure"]
             record.label_karatage = cells["karatage"]
             record.label_metal = cells["metal"]
+            slots = record._get_family_slots()
+            record.label_slots_note = (
+                "On this family the cells are reused: "
+                + ", ".join("%s shows %s" % (CELL_CAPTION.get(c, c), " / ".join(v))
+                            for c, v in slots.items())
+                if slots else False)
 
     def get_jewelry_label_zpl(self):
         self.ensure_one()

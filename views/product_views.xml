@@ -27,6 +27,10 @@
                         from. An empty box prints empty -- every value has a fixed spot on
                         the tag, and nothing moves up to fill a gap.
                     </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not label_slots_note">
+                        <field name="label_slots_note" readonly="1" nolabel="1"/>
+                    </div>
                     <group>
                         <group string="Spec block, left column">
                             <field name="label_carat_qty"/>
