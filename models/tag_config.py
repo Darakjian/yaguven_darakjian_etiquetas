@@ -66,10 +66,15 @@ class YagTagLine(models.Model):
     create_variant = fields.Selection(
         related="attribute_id.create_variant", readonly=True)
 
-    _sql_constraints = [
-        ("attr_por_categoria", "unique(category_id, attribute_id)",
-         "That attribute is already configured on this category."),
-    ]
+    # Odoo 19 declares SQL constraints as class attributes. `_sql_constraints` is NOT
+    # honoured any more and fails SILENTLY: verified on 2026-08-31 against the live
+    # database, where only the foreign keys had been created for this model -- and the
+    # same is true of `yaguven_darakjian_pos_ticket`, which believes it has a unique
+    # constraint and does not.
+    _attr_por_categoria = models.Constraint(
+        "unique(category_id, attribute_id)",
+        "That attribute is already configured on this category.",
+    )
 
     @api.constrains("category_id", "slot")
     def _check_slot_unico(self):
