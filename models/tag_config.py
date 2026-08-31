@@ -55,7 +55,8 @@ class YagTagLine(models.Model):
     slot = fields.Selection(
         SLOTS, string="Tag cell",
         help="Which of the eight cells this attribute prints in. Leave it empty for an "
-             "attribute that should be loaded but not printed.")
+             "attribute that should be loaded but not printed. Several attributes may "
+             "share a cell: they are tried in order and the first one with a value wins.")
     admite_varios = fields.Boolean(
         "Several values allowed", default=False,
         help="Whether a product of this family may carry more than one value here, which "
@@ -76,19 +77,11 @@ class YagTagLine(models.Model):
         "That attribute is already configured on this category.",
     )
 
-    @api.constrains("category_id", "slot")
-    def _check_slot_unico(self):
-        """One attribute per cell. The tag has eight fixed spots and nothing moves up to
-        fill a gap: two attributes on the same cell would silently hide one of them."""
-        for line in self:
-            if not line.slot:
-                continue
-            otra = self.search([("category_id", "=", line.category_id.id),
-                                ("slot", "=", line.slot), ("id", "!=", line.id)], limit=1)
-            if otra:
-                raise ValidationError(
-                    "The cell '%s' is already taken by '%s' on this category."
-                    % (dict(SLOTS)[line.slot], otra.attribute_id.name))
+    # A cell may hold SEVERAL attributes, and that is on purpose: the tag has always
+    # worked by cascade -- Measure tries Ring Size, then Length, then Width, nine
+    # candidates -- because those attributes are mutually exclusive by piece type. A
+    # ring has a ring size, a necklace has a length, and no piece has both. The order
+    # you drag them into IS the cascade, and the first one carrying a value wins.
 
     @api.constrains("admite_varios", "attribute_id")
     def _check_admite_varios(self):

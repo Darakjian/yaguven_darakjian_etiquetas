@@ -411,10 +411,24 @@ class ProductProduct(models.Model):
     def _get_family_slots(self):
         """The cell mapping this piece's family uses, or None to keep the jewellery one.
 
-        Read off the category path so a piece follows its family without anyone tagging it
-        by hand: `Merch / Watches / ...` is a watch, and so is `Watch Straps`.
+        FIRST the configuration on the product category (`yag.tag.line`), which is where
+        this belongs: it can be changed by whoever knows the pieces, without a deploy, and
+        it inherits along the category tree so a branch is set up once. A cell may hold
+        several attributes -- they are tried in the order they were dragged into, the way
+        the tag has always worked.
+
+        The hardcoded map below is the FALLBACK, kept so nothing that works today can
+        break while the branches are being configured. Once every family has its setup it
+        can go.
         """
         self.ensure_one()
+        _origen, config = self.categ_id._yag_tag_config()
+        if config:
+            slots = {}
+            for line in config.sorted("sequence").filtered("slot"):
+                slots.setdefault(line.slot, []).append(line.attribute_id.name)
+            if slots:
+                return slots
         path = self.categ_id.complete_name or ""
         for token, family in FAMILY_BY_CATEGORY.items():
             if token in path:
@@ -483,7 +497,7 @@ class ProductProduct(models.Model):
 
     @api.depends("product_template_attribute_value_ids",
                  "product_tmpl_id.attribute_line_ids.value_ids",
-                 "categ_id")
+                 "categ_id", "categ_id.yag_tag_line_ids")
     def _compute_label_cells(self):
         """Each cell to its own field, straight off the same dictionary the tag is built
         from. An empty cell stays empty here too -- that is the fixed-slot rule of the
