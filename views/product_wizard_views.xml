@@ -17,9 +17,10 @@
                  invisible="not modelo_existente_id"/>
         </div>
         <group>
+          <field name="image_1920" widget="image" class="oe_avatar" nolabel="1"/>
           <group>
             <field name="name" placeholder="e.g. Detrola on Bracelet 41mm"/>
-            <field name="categ_id"/>
+            <field name="categ_id" options="{'no_create': True, 'no_create_edit': True}"/>
           </group>
           <group>
             <field name="default_code" placeholder="e.g. WTCH.00086197"/>

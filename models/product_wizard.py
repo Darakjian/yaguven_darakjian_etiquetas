@@ -32,6 +32,7 @@ class YagProductWizard(models.TransientModel):
     default_code = fields.Char("Internal reference")
     standard_price = fields.Float("Cost")
     list_price = fields.Float("Sales price")
+    image_1920 = fields.Image("Photo", max_width=1920, max_height=1920)
     line_ids = fields.One2many("yag.product.wizard.line", "wizard_id", "Attributes")
 
     # Surfaced, never acted on by itself: whether this looks like a model already loaded.
@@ -106,6 +107,7 @@ class YagProductWizard(models.TransientModel):
             "is_storable": True,
             "list_price": self.list_price,
             "standard_price": self.standard_price,
+            "image_1920": self.image_1920,
             "attribute_line_ids": [(0, 0, {
                 "attribute_id": l.attribute_id.id,
                 "value_ids": [(6, 0, l.value_ids.ids)],
