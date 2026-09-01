@@ -33,6 +33,17 @@ class YagProductWizard(models.TransientModel):
     standard_price = fields.Float("Cost")
     list_price = fields.Float("Sales price")
     image_1920 = fields.Image("Photo", max_width=1920, max_height=1920)
+    # Odoo 19 splits what used to be one field: `type` says what it is, `is_storable`
+    # whether its stock is followed, and `tracking` how each unit is told apart.
+    type = fields.Selection(
+        [("consu", "Goods"), ("service", "Service"), ("combo", "Combo")],
+        "Product type", required=True, default="consu")
+    is_storable = fields.Boolean("Track inventory", default=True)
+    tracking = fields.Selection(
+        [("none", "By quantity"), ("lot", "By lots"), ("serial", "By unique serial number")],
+        "Traceability", required=True, default="none",
+        help="A serial number is where the identity of the physical piece lives -- it is "
+             "where the GIA certificate goes. Choose it for a piece that is unique.")
     line_ids = fields.One2many("yag.product.wizard.line", "wizard_id", "Attributes")
 
     # Surfaced, never acted on by itself: whether this looks like a model already loaded.
@@ -41,6 +52,18 @@ class YagProductWizard(models.TransientModel):
     modelo_existente_id = fields.Many2one(
         "product.template", "Existing model", readonly=True)
     aviso = fields.Char(readonly=True)
+
+    @api.onchange("type")
+    def _onchange_type(self):
+        """A service has no stock to follow and no unit to tell apart."""
+        if self.type != "consu":
+            self.is_storable = False
+            self.tracking = "none"
+
+    @api.onchange("is_storable")
+    def _onchange_is_storable(self):
+        if not self.is_storable:
+            self.tracking = "none"
 
     @api.onchange("categ_id")
     def _onchange_categ_id(self):
@@ -104,7 +127,9 @@ class YagProductWizard(models.TransientModel):
         tmpl = self.env["product.template"].create({
             "name": self.name.strip(),
             "categ_id": self.categ_id.id,
-            "is_storable": True,
+            "type": self.type,
+            "is_storable": self.is_storable if self.type == "consu" else False,
+            "tracking": self.tracking if self.is_storable and self.type == "consu" else "none",
             "list_price": self.list_price,
             "standard_price": self.standard_price,
             "image_1920": self.image_1920,

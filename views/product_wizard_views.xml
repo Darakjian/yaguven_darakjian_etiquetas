@@ -21,11 +21,14 @@
           <group>
             <field name="name" placeholder="e.g. Detrola on Bracelet 41mm"/>
             <field name="categ_id" options="{'no_create': True, 'no_create_edit': True}"/>
+            <field name="type" widget="radio" options="{'horizontal': True}"/>
           </group>
           <group>
             <field name="default_code" placeholder="e.g. WTCH.00086197"/>
             <field name="standard_price"/>
             <field name="list_price"/>
+            <field name="is_storable" invisible="type != 'consu'"/>
+            <field name="tracking" invisible="type != 'consu' or not is_storable"/>
           </group>
         </group>
         <field name="line_ids" nolabel="1">
