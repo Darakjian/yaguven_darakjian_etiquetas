@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_yag_product_wizard_form" model="ir.ui.view">
+    <field name="name">yag.product.wizard.form</field>
+    <field name="model">yag.product.wizard</field>
+    <field name="arch" type="xml">
+      <form string="New product">
+        <div class="alert alert-info" role="alert">
+          Choose the category first: it decides which attributes are asked for, and they
+          are the ones that print on the tag. An attribute left empty prints an empty
+          cell -- nothing moves up to fill a gap.
+        </div>
+        <div class="alert alert-warning" role="alert" invisible="not aviso">
+          <field name="aviso" readonly="1" nolabel="1"/>
+          <field name="modelo_existente_id" readonly="1"
+                 invisible="not modelo_existente_id"/>
+        </div>
+        <group>
+          <group>
+            <field name="name" placeholder="e.g. Detrola on Bracelet 41mm"/>
+            <field name="categ_id"/>
+          </group>
+          <group>
+            <field name="default_code" placeholder="e.g. WTCH.00086197"/>
+            <field name="standard_price"/>
+            <field name="list_price"/>
+          </group>
+        </group>
+        <field name="line_ids" nolabel="1">
+          <list editable="bottom" create="false" delete="false">
+            <field name="sequence" column_invisible="1"/>
+            <field name="admite_varios" column_invisible="1"/>
+            <field name="attribute_id" readonly="1"/>
+            <field name="value_ids" widget="many2many_tags"
+                   options="{'no_create': True}"
+                   domain="[('attribute_id', '=', attribute_id)]"/>
+            <field name="slot" string="Tag cell" readonly="1" optional="show"/>
+            <field name="obligatorio" string="Required" readonly="1" optional="show"/>
+          </list>
+        </field>
+        <footer>
+          <button name="action_crear" type="object" string="Create product"
+                  class="btn-primary"/>
+          <button string="Cancel" class="btn-secondary" special="cancel"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_yag_product_wizard" model="ir.actions.act_window">
+    <field name="name">New product (guided)</field>
+    <field name="res_model">yag.product.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+  </record>
+
+  <menuitem id="menu_yag_product_wizard"
+            name="New product (guided)"
+            parent="stock.menu_stock_inventory_control"
+            action="action_yag_product_wizard"
+            sequence="5"/>
+
+</odoo>
