@@ -13,6 +13,15 @@
                 icon="fa-plus-circle" string="New product (guided)"
                 invisible="state not in ('draft', 'sent')"/>
       </xpath>
+
+      <!-- The product dropdown no longer offers to create one. Typing a name and
+           choosing "Create and edit" opens the bare product form, which is exactly what
+           this is meant to replace: it asks nothing about the family and lets the piece
+           be born empty. The guided button above the lines is the way in. -->
+      <xpath expr="//field[@name='order_line']/list/field[@name='product_id']"
+             position="attributes">
+        <attribute name="options">{'no_create': True, 'no_create_edit': True}</attribute>
+      </xpath>
     </field>
   </record>
 
