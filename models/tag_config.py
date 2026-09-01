@@ -79,7 +79,7 @@ class YagTagLine(models.Model):
     category_id = fields.Many2one(
         "product.category", required=True, ondelete="cascade", index=True)
     attribute_id = fields.Many2one("product.attribute", required=True)
-    sequence = fields.Integer(default=10)
+    sequence = fields.Integer("Sequence", default=10)
     cell_id = fields.Many2one(
         "yag.tag.cell", string="Tag cell", ondelete="restrict",
         help="Which of the eight cells this attribute prints in. Leave it empty for an "

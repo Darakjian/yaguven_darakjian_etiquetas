@@ -56,7 +56,7 @@ class YagProductWizard(models.TransientModel):
     # data is right, and asking them to come back later is asking for the empty cells this
     # whole thing exists to prevent.
     purchase_order_id = fields.Many2one("purchase.order", readonly=True)
-    aviso = fields.Char(readonly=True)
+    aviso = fields.Char("Notice", readonly=True)
 
     @api.onchange("type")
     def _onchange_type(self):
@@ -178,12 +178,12 @@ class YagProductWizardLine(models.TransientModel):
     _order = "sequence, id"
 
     wizard_id = fields.Many2one("yag.product.wizard", required=True, ondelete="cascade")
-    sequence = fields.Integer(default=10)
+    sequence = fields.Integer("Sequence", default=10)
     attribute_id = fields.Many2one("product.attribute", required=True, readonly=True)
     value_ids = fields.Many2many("product.attribute.value", string="Value")
-    admite_varios = fields.Boolean(readonly=True)
-    obligatorio = fields.Boolean(readonly=True)
-    slot = fields.Char(readonly=True)
+    admite_varios = fields.Boolean("Several values allowed", readonly=True)
+    obligatorio = fields.Boolean("Required", readonly=True)
+    slot = fields.Char("Tag cell", readonly=True)
 
     @api.constrains("value_ids", "admite_varios")
     def _check_varios(self):
