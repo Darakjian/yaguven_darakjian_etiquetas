@@ -36,8 +36,14 @@
             <field name="sequence" column_invisible="1"/>
             <field name="admite_varios" column_invisible="1"/>
             <field name="attribute_id" readonly="1"/>
+            <!-- A value CAN be created from here on purpose. Blocking it stops the
+                 person mid-load, and they will not wait: they leave the cell empty and
+                 carry on, which is the very thing this wizard exists to prevent. A
+                 misspelt value gets corrected later; an empty cell is noticed by nobody
+                 until someone prints the tag. -->
             <field name="value_ids" widget="many2many_tags"
-                   options="{'no_create': True}"
+                   options="{'no_quick_create': True}"
+                   context="{'default_attribute_id': attribute_id}"
                    domain="[('attribute_id', '=', attribute_id)]"/>
             <field name="slot" string="Tag cell" readonly="1" optional="show"/>
             <field name="obligatorio" string="Required" readonly="1" optional="show"/>
