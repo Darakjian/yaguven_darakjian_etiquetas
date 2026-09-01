@@ -26,11 +26,13 @@
               <field name="yag_tag_lineas" readonly="1"/>
             </group>
             <field name="yag_tag_line_ids">
-              <!-- No optional column here on purpose: an optional column changes how
-                   many columns the row has while it is being edited, and that is what
-                   makes Owl fail to patch the DOM when the cell selection changes. The
-                   attribute's mode is shown read-only as a plain column instead. -->
-              <list editable="bottom">
+              <!-- The list does NOT edit inline. Changing the cell on a row raised
+                   an Owl DOM patch error ("the node before which the new node is to be
+                   inserted is not a child of this node"), twice, and it is not worth
+                   guessing at a rendering bug we cannot reproduce from the server. A row
+                   opens in a dialog instead, which is one click more and does not break.
+                   Dragging to reorder still works: the handle does not need inline edit. -->
+              <list>
                 <field name="sequence" widget="handle"/>
                 <field name="attribute_id"/>
                 <field name="cell_id"/>
@@ -38,6 +40,15 @@
                 <field name="obligatorio"/>
                 <field name="create_variant" readonly="1"/>
               </list>
+              <form>
+                <group>
+                  <field name="attribute_id"/>
+                  <field name="cell_id"/>
+                  <field name="create_variant" readonly="1"/>
+                  <field name="admite_varios"/>
+                  <field name="obligatorio"/>
+                </group>
+              </form>
             </field>
           </page>
         </notebook>
