@@ -194,6 +194,16 @@ Y_BOT = LABEL_HEIGHT_DOTS - 20        # 92: no field may end lower than this
 #
 # Weight and quantity share one cell ("0.62ct x41"), which is how they get read anyway:
 # with 72 usable dots there is room for 4 rows of 18, not 5.
+# The cells in reading order, with the caption the tab shows for each.
+GRID_ORDEN = [("carat_qty", "Carat / Qty"), ("clarity", "Clarity"), ("color", "Color"),
+              ("origin", "Origin"), ("clasp", "Clasp"), ("measure", "Measure"),
+              ("karatage", "Karatage"), ("metal", "Metal")]
+# What each cell reads when the family has no setup: the jewellery cascades.
+DEFECTO_ATTR = {"carat_qty": "stone carat / quantity", "clarity": "Clarity",
+                "color": "Color", "origin": "Diamond Origin", "clasp": "Clasp",
+                "measure": "Ring Size / Length / Width", "karatage": "Karatage",
+                "metal": "Material"}
+
 GRID = [["carat_qty", "clasp"],
         ["clarity", "measure"],
         ["color", "karatage"],
@@ -385,6 +395,13 @@ class ProductProduct(models.Model):
     # "Clarity: Stainless Steel" on a watch. This line says what each reused cell is
     # actually showing, so nobody has to guess.
     label_slots_note = fields.Char(compute="_compute_label_cells")
+    # The eight cells, named the way this family actually uses them. The static captions
+    # of the fields are the jewellery ones -- a watch tab read "Clarity: Rubber", which
+    # tells nobody anything -- and a field's label cannot change per record. So the tab
+    # shows a table built for the piece in hand: the cell, the attribute it reads, and
+    # what it prints. An empty cell says WHICH attribute is missing, which turns the tab
+    # from a mirror into the loading guide.
+    label_tabla = fields.Html(compute="_compute_label_cells", sanitize=False)
 
     def _get_attribute_map(self):
         """The piece's attributes, combining template and variant.
@@ -458,6 +475,38 @@ class ProductProduct(models.Model):
                 return attr_map[name]
         return ""
 
+    def _label_tabla_html(self, cells):
+        """The tab, told for the piece in hand rather than in jewellery captions."""
+        self.ensure_one()
+        slots = self._get_family_slots() or {}
+        attr_map = self._get_attribute_map()
+        filas = []
+        for clave, titulo in GRID_ORDEN:
+            candidatos = slots.get(clave)
+            valor = cells.get(clave) or ""
+            if candidatos:
+                lee = next((a for a in candidatos if attr_map.get(a)), candidatos[0])
+            else:
+                lee = DEFECTO_ATTR.get(clave, "")
+            if valor:
+                filas.append(
+                    "<tr><td style='padding:2px 12px 2px 0;color:#666'>%s</td>"
+                    "<td style='padding:2px 12px 2px 0;color:#666'>%s</td>"
+                    "<td style='padding:2px 0;font-weight:600'>%s</td></tr>"
+                    % (titulo, lee, valor))
+            else:
+                filas.append(
+                    "<tr><td style='padding:2px 12px 2px 0;color:#aaa'>%s</td>"
+                    "<td style='padding:2px 12px 2px 0;color:#aaa'>%s</td>"
+                    "<td style='padding:2px 0;color:#aaa;font-style:italic'>"
+                    "empty &mdash; %s not loaded</td></tr>"
+                    % (titulo, lee or "&mdash;", lee or "no attribute"))
+        return ("<table style='width:100%'><tr>"
+                "<th style='text-align:left;padding-bottom:4px'>Tag cell</th>"
+                "<th style='text-align:left;padding-bottom:4px'>Reads</th>"
+                "<th style='text-align:left;padding-bottom:4px'>Prints</th></tr>"
+                + "".join(filas) + "</table>")
+
     def _get_label_cells(self):
         """The spec values BROKEN OUT, one per table cell.
 
@@ -514,6 +563,7 @@ class ProductProduct(models.Model):
             record.label_measure = cells["measure"]
             record.label_karatage = cells["karatage"]
             record.label_metal = cells["metal"]
+            record.label_tabla = record._label_tabla_html(cells)
             slots = record._get_family_slots()
             record.label_slots_note = (
                 "On this family the cells are reused: "

@@ -27,24 +27,12 @@
                         from. An empty box prints empty -- every value has a fixed spot on
                         the tag, and nothing moves up to fill a gap.
                     </div>
-                    <div class="alert alert-warning" role="alert"
-                         invisible="not label_slots_note">
-                        <field name="label_slots_note" readonly="1" nolabel="1"/>
-                    </div>
-                    <group>
-                        <group string="Spec block, left column">
-                            <field name="label_carat_qty"/>
-                            <field name="label_clarity"/>
-                            <field name="label_color"/>
-                            <field name="label_origin"/>
-                        </group>
-                        <group string="Spec block, right column">
-                            <field name="label_clasp"/>
-                            <field name="label_measure"/>
-                            <field name="label_karatage"/>
-                            <field name="label_metal"/>
-                        </group>
-                    </group>
+                    <!-- The table is built for the piece in hand: the field captions
+                         are the jewellery ones and cannot change per record, so a watch
+                         used to read "Clarity: Rubber". Each row says which cell, which
+                         attribute it reads, and what it prints. An empty cell names the
+                         attribute that is missing. -->
+                    <field name="label_tabla" nolabel="1" readonly="1"/>
                     <group string="Identity block">
                         <group>
                             <field name="default_code" string="SKU" readonly="1"/>
