@@ -18,9 +18,9 @@
         </div>
         <group>
           <field name="image_1920" widget="image" class="oe_avatar" nolabel="1"/>
+          <!-- The category comes FIRST: it decides which attributes are asked for, so
+               choosing it before the name is the order the form actually works in. -->
           <group>
-            <!-- The category comes FIRST: it decides which attributes are asked for,
-                 so choosing it before the name is the order the form actually works in. -->
             <field name="categ_id" options="{'no_create': True, 'no_create_edit': True}"/>
             <field name="name" placeholder="e.g. Detrola on Bracelet 41mm"/>
             <field name="type" widget="radio" options="{'horizontal': True}"/>
