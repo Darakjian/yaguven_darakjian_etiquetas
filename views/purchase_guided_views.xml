@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!-- Loading the piece from the purchase itself: the buyer has the supplier's
+       information in front of them, which is the moment the data is right. -->
+  <record id="view_purchase_order_form_guided" model="ir.ui.view">
+    <field name="name">purchase.order.form.guided</field>
+    <field name="model">purchase.order</field>
+    <field name="inherit_id" ref="purchase.purchase_order_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='order_line']" position="before">
+        <button name="action_yag_nuevo_producto" type="object" class="btn-link"
+                icon="fa-plus-circle" string="New product (guided)"
+                invisible="state not in ('draft', 'sent')"/>
+      </xpath>
+    </field>
+  </record>
+
+</odoo>

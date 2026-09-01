@@ -51,6 +51,11 @@ class YagProductWizard(models.TransientModel):
     # models silently is how a catalogue ends up wrong in a way nobody can trace.
     modelo_existente_id = fields.Many2one(
         "product.template", "Existing model", readonly=True)
+    # When it is opened from a purchase, the piece goes straight onto the order: the
+    # moment the buyer has the supplier's information in front of them is the moment the
+    # data is right, and asking them to come back later is asking for the empty cells this
+    # whole thing exists to prevent.
+    purchase_order_id = fields.Many2one("purchase.order", readonly=True)
     aviso = fields.Char(readonly=True)
 
     @api.onchange("type")
@@ -141,6 +146,20 @@ class YagProductWizard(models.TransientModel):
         variantes = tmpl.product_variant_ids
         if len(variantes) == 1 and self.default_code:
             variantes.default_code = self.default_code
+
+        if self.purchase_order_id and len(variantes) == 1:
+            self.env["purchase.order.line"].create({
+                "order_id": self.purchase_order_id.id,
+                "product_id": variantes.id,
+                "product_qty": 1,
+                "price_unit": self.standard_price,
+            })
+            return {"type": "ir.actions.act_window",
+                    "res_model": "purchase.order",
+                    "res_id": self.purchase_order_id.id,
+                    "view_mode": "form", "target": "current"}
+        # Several versions came out and we do not guess which one was bought: the list
+        # opens so the codes go in and the buyer picks the ones that belong on the order.
         # More than one version means one code each, and they are filled in a list rather
         # than opening them one by one: with thirteen colours that is thirteen openings.
         return {
@@ -177,3 +196,19 @@ class YagProductWizardLine(models.TransientModel):
                     "'%s' takes a single value on this family. Loading several would "
                     "create one version of the product per value."
                 ) % line.attribute_id.name)
+
+
+class PurchaseOrder(models.Model):
+    _inherit = "purchase.order"
+
+    def action_yag_nuevo_producto(self):
+        """Open the guided wizard from the purchase and come back with the line loaded."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "New product (guided)",
+            "res_model": "yag.product.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_purchase_order_id": self.id},
+        }
