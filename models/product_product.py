@@ -391,6 +391,15 @@ class ProductProduct(models.Model):
     # what it prints. An empty cell says WHICH attribute is missing, which turns the tab
     # from a mirror into the loading guide.
     label_tabla = fields.Html(compute="_compute_label_cells", sanitize=False)
+    # The attribute lines of this piece's model, writable from the Tag tab. What prints
+    # comes from the attribute, so the tab that says a cell is empty is the tab where it
+    # should be possible to fill it -- otherwise the person reads "Color: empty" and has
+    # to go find where that value lives.
+    # They belong to the TEMPLATE, so a change here reaches every version of the model.
+    # That is correct for the attributes that describe it, which is what the tag prints.
+    tag_attribute_line_ids = fields.One2many(
+        related="product_tmpl_id.attribute_line_ids", readonly=False,
+        string="Attributes of this model")
 
     def _get_attribute_map(self):
         """The piece's attributes, combining template and variant.
