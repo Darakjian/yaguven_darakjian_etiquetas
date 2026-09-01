@@ -160,3 +160,57 @@ class ProductCategory(models.Model):
             origen, lineas = cat._yag_tag_config()
             cat.yag_tag_heredada_de = origen if origen != cat else False
             cat.yag_tag_lineas = len(lineas.filtered("cell_id"))
+
+
+class ProductTemplateAttributeLine(models.Model):
+    """The guard against the silent archiving.
+
+    Measured and written down on 2026-08-20, then hit again while loading watches: what
+    matters when touching the attributes of a template with a live variant is NOT whether
+    the product has stock but how many values the line carries.
+
+        no_variant, any number of values -> variants untouched, no risk
+        always with ONE value            -> one combination, Odoo updates in place
+        always with TWO OR MORE          -> ARCHIVES the live variant and creates others
+
+    In that third case the code, the stock and the movements stay on the ARCHIVED variant.
+    Accounting still balances and the QA on amounts passes; what breaks is that the shop
+    looks for the piece and finds it at zero. Nothing warns.
+
+    So a second value on a variant-generating attribute is refused when the variant
+    carries stock or has moved. It is not a matter of taste: it is the one operation on
+    this screen that can lose track of a physical piece.
+    """
+    _inherit = "product.template.attribute.line"
+
+    def _yag_variantes_con_historia(self):
+        """The variants of this template that hold stock or have already moved."""
+        self.ensure_one()
+        variantes = self.product_tmpl_id.product_variant_ids
+        if not variantes:
+            return variantes.browse()
+        con_stock = variantes.filtered(lambda v: v.qty_available)
+        # One read_group instead of one query per variant: this runs on every save of an
+        # attribute line, and a model with thirteen colours would be thirteen queries.
+        movidas_ids = {g["product_id"][0] for g in self.env["stock.move.line"].read_group(
+            [("product_id", "in", variantes.ids)], ["product_id"], ["product_id"])}
+        return con_stock | variantes.filtered(lambda v: v.id in movidas_ids)
+
+    @api.constrains("value_ids")
+    def _yag_check_archivado_silencioso(self):
+        for line in self:
+            if line.attribute_id.create_variant != "always":
+                continue
+            if len(line.value_ids) < 2:
+                continue
+            riesgo = line._yag_variantes_con_historia()
+            if riesgo:
+                raise ValidationError(
+                    "'%s' would open versions of this model, and Odoo does that by "
+                    "archiving the live variant and creating one per combination. These "
+                    "carry stock or movements and would be left archived, with the piece "
+                    "showing as zero at the counter: %s.\n\n"
+                    "If the model really has to open versions, move the stock out first "
+                    "or create the new version as its own product."
+                    % (line.attribute_id.name,
+                       ", ".join(riesgo.mapped(lambda v: v.default_code or v.display_name))))
