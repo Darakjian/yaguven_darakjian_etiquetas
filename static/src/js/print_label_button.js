@@ -34,26 +34,37 @@ class PrintJewelryLabelButton extends Component {
                 "get_jewelry_label_zpl",
                 [[resId]]
             );
-            const response = await fetch(BRIDGE_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ data: zpl }),
-            });
-            if (!response.ok) {
-                throw new Error(await response.text());
+            // The tag goes to the chatter whether or not the printer answers. Away from
+            // the counter, or on a tablet, seeing what the tag would say is worth as much
+            // as printing it -- and the chatter entry says which of the two happened.
+            let impreso = false;
+            let fallo = "";
+            try {
+                const response = await fetch(BRIDGE_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ data: zpl }),
+                });
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+                impreso = true;
+            } catch (error) {
+                fallo = error.message;
             }
-            this.notification.add(_t("Tag sent to the Zebra printer"), {
-                type: "success",
-            });
-            // The chatter entry goes AFTER the bridge says OK: what gets recorded is what
-            // actually came out on paper, not every attempt. And it sits in its own try:
-            // if the chatter fails the tag was printed all the same, and telling the user
-            // it was not would be a lie.
+            this.notification.add(
+                impreso
+                    ? _t("Tag sent to the Zebra printer")
+                    : _t("The printer did not answer. The tag is in the chatter: %s", fallo),
+                { type: impreso ? "success" : "warning" }
+            );
+            // The chatter entry sits in its own try: if it fails the tag may well have
+            // been printed, and saying it was not would be a lie.
             try {
                 await this.orm.call(
                     "product.product",
                     "action_log_printed_label",
-                    [[resId]]
+                    [[resId], impreso]
                 );
                 // Refreshing is cosmetic - it just saves a manual reload to see the
                 // message - and the reload API changes between versions, so a failure is
@@ -66,7 +77,7 @@ class PrintJewelryLabelButton extends Component {
                 }
             } catch (error) {
                 this.notification.add(
-                    _t("Printed, but the preview could not be logged: %s", error.message),
+                    _t("The tag could not be logged in the chatter: %s", error.message),
                     { type: "warning" }
                 );
             }

@@ -710,20 +710,29 @@ class ProductProduct(models.Model):
             "datas": base64.b64encode(self._draw_die_cut(raw)),
         })
 
-    def action_log_printed_label(self):
-        """Called by the button AFTER the bridge has confirmed the print. What gets posted
-        is what actually came out on paper; failed attempts do not clutter the chatter."""
+    def action_log_printed_label(self, impreso=True):
+        """Post the tag to the chatter, whether or not it reached the printer.
+
+        It used to be posted only after the bridge confirmed, so the record was of what
+        actually came out on paper. But the tag is worth seeing when the printer is not
+        there either: away from the counter, on a tablet, or just to check that a piece is
+        loaded properly before walking over to print it. What the entry SAYS changes --
+        printed, or only rendered -- so the record stays honest either way.
+        """
         self.ensure_one()
         zpl = self.get_jewelry_label_zpl()
         att = self._label_preview_attachment(zpl)
 
         cuerpo = "<p><strong>%s</strong> &mdash; %s</p>" % (
-            html_escape(_("Tag printed")),
+            html_escape(_("Tag printed") if impreso else _("Tag preview")),
             html_escape(self.default_code or self.display_name))
+        if not impreso:
+            cuerpo += "<p>%s</p>" % html_escape(_(
+                "It did NOT come out of the printer: the bridge did not answer. This is "
+                "what the tag would say."))
         if not att:
             cuerpo += "<p>%s</p>" % html_escape(_(
-                "The tag came out of the printer, but the preview could not be built "
-                "(the rendering service did not answer)."))
+                "The preview could not be built (the rendering service did not answer)."))
         self.message_post(
             body=Markup(cuerpo),
             message_type="comment",
