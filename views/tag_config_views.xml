@@ -26,13 +26,17 @@
               <field name="yag_tag_lineas" readonly="1"/>
             </group>
             <field name="yag_tag_line_ids">
+              <!-- No optional column here on purpose: an optional column changes how
+                   many columns the row has while it is being edited, and that is what
+                   makes Owl fail to patch the DOM when the cell selection changes. The
+                   attribute's mode is shown read-only as a plain column instead. -->
               <list editable="bottom">
                 <field name="sequence" widget="handle"/>
                 <field name="attribute_id"/>
                 <field name="slot"/>
-                <field name="create_variant" optional="show"/>
                 <field name="admite_varios"/>
                 <field name="obligatorio"/>
+                <field name="create_variant" readonly="1"/>
               </list>
             </field>
           </page>
