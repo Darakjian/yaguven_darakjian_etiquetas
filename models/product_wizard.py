@@ -93,7 +93,11 @@ class YagProductWizard(models.TransientModel):
                 "They are what identifies the piece on the tag."
             ) % ", ".join(faltan.mapped("attribute_id.name")))
         cargadas = self.line_ids.filtered("value_ids")
-        if not cargadas:
+        # A family with no setup yet loads with no attributes and that is fine: thirteen
+        # of the fourteen branches are still unconfigured, and refusing them would block
+        # loading almost the whole catalogue. The tag prints empty, which is honest and
+        # exactly what it does today.
+        if self.line_ids and not cargadas:
             raise UserError(_("No attribute carries a value: the tag would print empty."))
 
         tmpl = self.env["product.template"].create({
