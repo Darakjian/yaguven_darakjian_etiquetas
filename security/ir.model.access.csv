@@ -3,3 +3,5 @@ access_yag_tag_line_user,yag.tag.line user,model_yag_tag_line,base.group_user,1,
 access_yag_tag_line_manager,yag.tag.line manager,model_yag_tag_line,stock.group_stock_manager,1,1,1,1
 access_yag_product_wizard,yag.product.wizard,model_yag_product_wizard,base.group_user,1,1,1,1
 access_yag_product_wizard_line,yag.product.wizard.line,model_yag_product_wizard_line,base.group_user,1,1,1,1
+access_yag_tag_cell_user,yag.tag.cell user,model_yag_tag_cell,base.group_user,1,0,0,0
+access_yag_tag_cell_manager,yag.tag.cell manager,model_yag_tag_cell,stock.group_stock_manager,1,1,1,1

@@ -79,11 +79,6 @@ FAMILY_SLOTS = {
 FAMILY_BY_CATEGORY = {
     "Watch": "watches",
 }
-# The captions the screen prints for each cell, to explain a reuse in the words the user
-# is reading on the form.
-CELL_CAPTION = {"carat_qty": "Carat / Qty", "clarity": "Clarity", "color": "Color",
-                "origin": "Origin", "clasp": "Clasp", "measure": "Measure",
-                "karatage": "Karatage", "metal": "Metal"}
 
 # The metal goes abbreviated, matching the tag the store already uses ("YG").
 METAL_ABBR = {
@@ -194,20 +189,14 @@ Y_BOT = LABEL_HEIGHT_DOTS - 20        # 92: no field may end lower than this
 #
 # Weight and quantity share one cell ("0.62ct x41"), which is how they get read anyway:
 # with 72 usable dots there is room for 4 rows of 18, not 5.
-# The cells in reading order, with the caption the tab shows for each.
-GRID_ORDEN = [("carat_qty", "Carat / Qty"), ("clarity", "Clarity"), ("color", "Color"),
-              ("origin", "Origin"), ("clasp", "Clasp"), ("measure", "Measure"),
-              ("karatage", "Karatage"), ("metal", "Metal")]
 # What each cell reads when the family has no setup: the jewellery cascades.
 DEFECTO_ATTR = {"carat_qty": "stone carat / quantity", "clarity": "Clarity",
                 "color": "Color", "origin": "Diamond Origin", "clasp": "Clasp",
                 "measure": "Ring Size / Length / Width", "karatage": "Karatage",
                 "metal": "Material"}
 
-GRID = [["carat_qty", "clasp"],
-        ["clarity", "measure"],
-        ["color", "karatage"],
-        ["origin", "metal"]]
+# The grid used to live here. It is `yag.tag.cell` now: a cell is a record with its row
+# and column, so a spot can move and a new one can be added without a deploy.
 # THE SPEC BLOCK GREW from 14 to 17 in height (user request 2026-08-03: "make it more
 # visible") WITHOUT the text taking up a single dot more in width. This works because of
 # how ^A0N quantizes: the glyph width is set by the width parameter, not the height, and it
@@ -444,8 +433,8 @@ class ProductProduct(models.Model):
         _origen, config = self.categ_id._yag_tag_config()
         if config:
             slots = {}
-            for line in config.sorted("sequence").filtered("slot"):
-                slots.setdefault(line.slot, []).append(line.attribute_id.name)
+            for line in config.sorted("sequence").filtered("cell_id"):
+                slots.setdefault(line.cell_id.code, []).append(line.attribute_id.name)
             if slots:
                 return slots
         path = self.categ_id.complete_name or ""
@@ -481,7 +470,8 @@ class ProductProduct(models.Model):
         slots = self._get_family_slots() or {}
         attr_map = self._get_attribute_map()
         filas = []
-        for clave, titulo in GRID_ORDEN:
+        for cell in self.env["yag.tag.cell"].search([]):
+            clave, titulo = cell.code, cell.name
             candidatos = slots.get(clave)
             valor = cells.get(clave) or ""
             if candidatos:
@@ -565,21 +555,23 @@ class ProductProduct(models.Model):
             record.label_metal = cells["metal"]
             record.label_tabla = record._label_tabla_html(cells)
             slots = record._get_family_slots()
-            record.label_slots_note = (
-                "On this family the cells are reused: "
-                + ", ".join("%s shows %s" % (CELL_CAPTION.get(c, c), " / ".join(v))
-                            for c, v in slots.items())
-                if slots else False)
+            record.label_slots_note = False
 
     def get_jewelry_label_zpl(self):
         self.ensure_one()
         cells = self._get_label_cells()
 
         zpl = ["^XA^PW%d^LL%d" % (CANVAS_WIDTH_DOTS, LABEL_HEIGHT_DOTS)]
-        for i, row in enumerate(GRID):
-            for j, field in enumerate(row):
-                zpl.append(_field(X0 + TABLE_COLS_X[j], TABLE_TOP + TABLE_ROW_STEP * i,
-                                  FONT_TABLE, cells.get(field, ""), TABLE_COL_W[j]))
+        # The cells come from `yag.tag.cell`, so a spot can be moved or a new one added
+        # without a deploy. Only the VALUE is printed -- never the caption -- which is why
+        # a cell costs the room its value takes and nothing more.
+        for cell in self.env["yag.tag.cell"].search([]):
+            j, i = cell.columna - 1, cell.fila - 1
+            x = X0 + (TABLE_COLS_X[j] if j < len(TABLE_COLS_X)
+                      else TABLE_COLS_X[-1] + TABLE_COL_W[-1] * (j - len(TABLE_COLS_X) + 1))
+            w = TABLE_COL_W[j] if j < len(TABLE_COL_W) else TABLE_COL_W[-1]
+            zpl.append(_field(x, TABLE_TOP + TABLE_ROW_STEP * i,
+                              FONT_TABLE, cells.get(cell.code, ""), w))
         zpl.append(_field(COL_X, Y_SKU, FONT_SKU, self.default_code or "", COL_W,
                           cmd=FONT_SKU_CMD))
         zpl.append(_field(COL_X, Y_DESC, FONT_DESC, self.name or "", COL_W))

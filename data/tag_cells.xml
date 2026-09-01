@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+  <!-- The eight cells the cardboard has today, in the positions they already occupy.
+       They are seeded, not hardcoded: the row and column can be moved and new ones
+       added, and the tag builder follows whatever is here.
+       The caption is for the screen. The tag prints the value alone. -->
+
+  <record id="cell_carat_qty" model="yag.tag.cell">
+    <field name="name">Carat / Qty</field><field name="code">carat_qty</field>
+    <field name="fila">1</field><field name="columna">1</field>
+  </record>
+  <record id="cell_clarity" model="yag.tag.cell">
+    <field name="name">Clarity</field><field name="code">clarity</field>
+    <field name="fila">2</field><field name="columna">1</field>
+  </record>
+  <record id="cell_color" model="yag.tag.cell">
+    <field name="name">Color</field><field name="code">color</field>
+    <field name="fila">3</field><field name="columna">1</field>
+  </record>
+  <record id="cell_origin" model="yag.tag.cell">
+    <field name="name">Origin</field><field name="code">origin</field>
+    <field name="fila">4</field><field name="columna">1</field>
+  </record>
+  <record id="cell_clasp" model="yag.tag.cell">
+    <field name="name">Clasp</field><field name="code">clasp</field>
+    <field name="fila">1</field><field name="columna">2</field>
+  </record>
+  <record id="cell_measure" model="yag.tag.cell">
+    <field name="name">Measure</field><field name="code">measure</field>
+    <field name="fila">2</field><field name="columna">2</field>
+  </record>
+  <record id="cell_karatage" model="yag.tag.cell">
+    <field name="name">Karatage</field><field name="code">karatage</field>
+    <field name="fila">3</field><field name="columna">2</field>
+  </record>
+  <record id="cell_metal" model="yag.tag.cell">
+    <field name="name">Metal</field><field name="code">metal</field>
+    <field name="fila">4</field><field name="columna">2</field>
+  </record>
+
+</odoo>

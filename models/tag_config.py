@@ -28,19 +28,47 @@ product loads into a line stays with that product.
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
-# The eight cells of the tag, in the order they are read on the cardboard. They are the
-# computed fields of `product.product`: the cardboard is die-cut, so there are eight and
-# no more.
-SLOTS = [
-    ("carat_qty", "Carat / Qty"),
-    ("clarity", "Clarity"),
-    ("color", "Color"),
-    ("origin", "Origin"),
-    ("clasp", "Clasp"),
-    ("measure", "Measure"),
-    ("karatage", "Karatage"),
-    ("metal", "Metal"),
-]
+class YagTagCell(models.Model):
+    """A printable spot on the cardboard.
+
+    The eight cells used to be a list in the code, so adding one meant a deploy. They are
+    records now: a cell is a position, and the caption is only ever shown on screen --
+    THE TAG PRINTS THE VALUE ALONE, never a label, which is why adding a cell costs no
+    room for text and only room for the value itself.
+
+    What does not become configurable is the paper. The spec block has 72 usable dots of
+    height and at the current type four rows fit and five do not; that is measured, not
+    assumed. A third column fits across but narrow. So a ninth cell is possible and
+    something has to give -- smaller type, or narrower columns -- and the point of having
+    this as data is that the trade can be tried and undone without a deploy.
+    """
+    _name = "yag.tag.cell"
+    _description = "A printable cell on the jewelry tag"
+    _order = "fila, columna, id"
+
+    name = fields.Char("Caption", required=True,
+                       help="Shown on screen only. The tag prints the value alone.")
+    code = fields.Char(required=True, help="Technical name, used by the tag builder.")
+    fila = fields.Integer("Row", required=True, default=1)
+    columna = fields.Integer("Column", required=True, default=1)
+    active = fields.Boolean(default=True)
+
+    _code_uniq = models.Constraint("unique(code)", "That cell code already exists.")
+    _pos_uniq = models.Constraint(
+        "unique(fila, columna)", "There is already a cell in that row and column.")
+
+    @api.constrains("fila", "columna")
+    def _check_posicion(self):
+        """The paper is what it is. Four rows fit at the current type and five do not --
+        measured on the die-cut, not assumed -- so a fifth row would print off the card."""
+        for cell in self:
+            if cell.fila < 1 or cell.columna < 1:
+                raise ValidationError("Row and column start at 1.")
+            if cell.fila > 4:
+                raise ValidationError(
+                    "The spec block holds four rows at the current type: a fifth would "
+                    "print off the cardboard. To fit more, the type has to get smaller "
+                    "first.")
 
 
 class YagTagLine(models.Model):
@@ -52,8 +80,8 @@ class YagTagLine(models.Model):
         "product.category", required=True, ondelete="cascade", index=True)
     attribute_id = fields.Many2one("product.attribute", required=True)
     sequence = fields.Integer(default=10)
-    slot = fields.Selection(
-        SLOTS, string="Tag cell",
+    cell_id = fields.Many2one(
+        "yag.tag.cell", string="Tag cell", ondelete="restrict",
         help="Which of the eight cells this attribute prints in. Leave it empty for an "
              "attribute that should be loaded but not printed. Several attributes may "
              "share a cell: they are tried in order and the first one with a value wins.")
@@ -131,4 +159,4 @@ class ProductCategory(models.Model):
         for cat in self:
             origen, lineas = cat._yag_tag_config()
             cat.yag_tag_heredada_de = origen if origen != cat else False
-            cat.yag_tag_lineas = len(lineas.filtered("slot"))
+            cat.yag_tag_lineas = len(lineas.filtered("cell_id"))
