@@ -113,6 +113,11 @@ class ProductCategory(models.Model):
         Walking up `parent_id` is what lets a branch be configured once. A leaf that
         really needs something different sets its own lines and stops inheriting.
         """
+        # An empty recordset is a normal state, not an error: a product form that has
+        # not been given a category yet computes its tag cells all the same, and asking
+        # for the setup of no category has to answer "none" instead of blowing up.
+        if not self:
+            return self.browse(), self.env["yag.tag.line"]
         self.ensure_one()
         nodo = self
         while nodo:

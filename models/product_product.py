@@ -422,6 +422,8 @@ class ProductProduct(models.Model):
         can go.
         """
         self.ensure_one()
+        if not self.categ_id:
+            return None
         _origen, config = self.categ_id._yag_tag_config()
         if config:
             slots = {}
