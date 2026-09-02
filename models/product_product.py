@@ -334,6 +334,87 @@ Y_DESC = (COLA_TOP_DOTS + (COLA_BOT_DOTS - COLA_TOP_DOTS - DESC_INK_H) // 2
           - DESC_INK_OFFSET + DESC_NUDGE)
 
 
+# --- EL ANCHO REAL DEL TEXTO, PARA PODER RECORTARLO ANTES DE IMPRIMIR --------
+# `^FB` NO recorta. Cuando el texto no entra en el ancho declarado, la Zebra APILA las
+# palabras sobrantes unas encima de otras en el mismo renglon y ademas invade la columna
+# vecina. Medido el 2026-09-02 sobre `White South Sea & Golden`: 118 dots dentro de una
+# casilla de 76, y en el papel sale un amasijo ilegible -- no un recorte. Sobre el
+# catalogo entero, 164 de 2.269 valores (el 7 por ciento) exceden su casilla.
+#
+# Por eso el recorte lo hacemos NOSOTROS y con el ancho MEDIDO, no estimado: un ancho
+# promedio por caracter es lo que cortaba palabras al medio ("Box w/ Hi"). Cada avance
+# sale de renderizar `I<c>x10I` y restar el ancla -- knowledge/zpl_etiquetas_impresion §1.
+#
+# La escalable A0N CUANTIZA el ancho por escalones: los anchos 7 a 10 dan exactamente el
+# mismo avance, asi que UNA tabla sirve para la ficha (17,10) y para la descripcion
+# (14,8). Verificado: el mismo texto mide 118 dots en A0N 17,10 / 14,8 / 14,10 / 17,8.
+# El precio (24,18) cae en otro escalon y lleva la suya. Si alguien cambia el ancho
+# declarado a un escalon sin tabla, no se recorta: se imprime como antes, no se rompe.
+ADV_A0N_NARROW = {   # A0N con ancho declarado 7 a 10
+    ' ': 2.9, '!': 2.9, '"': 4.8, '#': 4.8, '$': 4.8, '%': 9, '&': 6.1, "'": 2.9, '(': 2.9,
+    ')': 2.9, '*': 4.8, '+': 9, ',': 2.9, '-': 9, '.': 2.9, '/': 2.9, '0': 4.8, '1': 4.8,
+    '2': 4.8, '3': 4.8, '4': 4.8, '5': 4.8, '6': 4.8, '7': 4.8, '8': 4.8, '9': 4.8, ':': 2.9,
+    ';': 2.9, '<': 9.9, '=': 9, '>': 9.9, '?': 4.4, '@': 9, 'A': 5.5, 'B': 5.5, 'C': 5.3,
+    'D': 5.9, 'E': 5, 'F': 5, 'G': 5.9, 'H': 6.1, 'I': 2.7, 'J': 4.4, 'K': 5.5, 'L': 4.8,
+    'M': 7.5, 'N': 6.1, 'O': 5.7, 'P': 5.5, 'Q': 5.7, 'R': 5.9, 'S': 5.3, 'T': 5, 'U': 6.1,
+    'V': 5.3, 'W': 8.1, 'X': 5.5, 'Y': 5.5, 'Z': 5, '[': 2.9, '\\': 4.8, ']': 2.9, '^': 2.9,
+    '_': 5, '`': 2.9, 'a': 4.6, 'b': 5, 'c': 4.4, 'd': 5, 'e': 4.8, 'f': 2.7, 'g': 5, 'h': 5,
+    'i': 2.6, 'j': 2.6, 'k': 4.4, 'l': 2.6, 'm': 7.5, 'n': 5, 'o': 4.8, 'p': 5, 'q': 5,
+    'r': 3.3, 's': 4.2, 't': 2.7, 'u': 5, 'v': 4.4, 'w': 6.6, 'x': 4.4, 'y': 4.4, 'z': 3.8,
+    '{': 5, '|': 5, '}': 5, '~': 2.9,
+}
+ADV_A0N_WIDE = {     # A0N con ancho declarado 18 (el precio)
+    ' ': 5.3, '!': 5.3, '"': 8.6, '#': 8.6, '$': 8.6, '%': 16.3, '&': 10.9, "'": 5.3, '(': 5.3,
+    ')': 5.3, '*': 8.6, '+': 16.3, ',': 5.3, '-': 16.3, '.': 5.3, '/': 5.3, '0': 8.6, '1': 8.6,
+    '2': 8.6, '3': 8.6, '4': 8.6, '5': 8.6, '6': 8.6, '7': 8.6, '8': 8.6, '9': 8.6, ':': 5.3,
+    ';': 5.3, '<': 17.9, '=': 16.3, '>': 17.9, '?': 8, '@': 16.3, 'A': 10, 'B': 10, 'C': 9.6,
+    'D': 10.6, 'E': 9, 'F': 9, 'G': 10.6, 'H': 10.9, 'I': 5, 'J': 8, 'K': 10, 'L': 8.6,
+    'M': 13.6, 'N': 10.9, 'O': 10.3, 'P': 10, 'Q': 10.3, 'R': 10.6, 'S': 9.6, 'T': 9,
+    'U': 10.9, 'V': 9.6, 'W': 14.6, 'X': 10, 'Y': 10, 'Z': 9, '[': 5.3, '\\': 8.6, ']': 5.3,
+    '^': 5.3, '_': 9, '`': 5.3, 'a': 8.3, 'b': 9, 'c': 8, 'd': 9, 'e': 8.6, 'f': 5, 'g': 9,
+    'h': 9, 'i': 4.6, 'j': 4.6, 'k': 8, 'l': 4.6, 'm': 13.6, 'n': 9, 'o': 8.6, 'p': 9, 'q': 9,
+    'r': 6, 's': 7.6, 't': 5, 'u': 9, 'v': 8, 'w': 12, 'x': 8, 'y': 8, 'z': 7, '{': 9, '|': 9,
+    '}': 9, '~': 5.3,
+}
+ADV_ABN_7 = 9.0      # ABN es de ancho fijo: 9 dots por caracter, medido igual
+# El arranque del campo, constante: medido +12 dots en textos de 3 y de 24 caracteres.
+FIELD_START_DOTS = 12
+ADVANCE_BY_FONT = {
+    ("A0N", 7): ADV_A0N_NARROW, ("A0N", 8): ADV_A0N_NARROW,
+    ("A0N", 9): ADV_A0N_NARROW, ("A0N", 10): ADV_A0N_NARROW,
+    ("A0N", 18): ADV_A0N_WIDE,
+    ("ABN", 7): ADV_ABN_7,
+}
+
+
+def _text_width_dots(text, cmd, width_param):
+    """Ancho que va a ocupar `text` en el papel. None si esa fuente no esta medida."""
+    adv = ADVANCE_BY_FONT.get((cmd, width_param))
+    if adv is None:
+        return None
+    if isinstance(adv, float):
+        return len(text) * adv + FIELD_START_DOTS
+    return sum(adv.get(ch, adv["n"]) for ch in text) + FIELD_START_DOTS
+
+
+def _fit(text, box, cmd, width_param):
+    """Corte seco al ultimo caracter que entra en `box` dots.
+
+    Seco y no por palabra: en una casilla de 76 dots entran unos 13 caracteres, y cortar
+    por palabra entera deja la casilla VACIA cada vez que la primera palabra ya no entra.
+    Preferimos un valor cortado y legible antes que una casilla en blanco.
+    """
+    ancho = _text_width_dots(text, cmd, width_param)
+    if ancho is None or ancho <= box:
+        return text
+    out = ""
+    for ch in text:
+        if _text_width_dots(out + ch, cmd, width_param) > box:
+            break
+        out += ch
+    return out.rstrip()
+
+
 def _zpl_safe(text):
     """`^` and `~` are ZPL command prefixes: inside an ^FD they break the label."""
     return (text or "").replace("^", " ").replace("~", " ")
@@ -353,6 +434,9 @@ def _field(x, y, font, text, width, lines=1, align="L", cmd="A0N"):
     """
     if not text:
         return ""
+    # El recorte solo tiene sentido con UNA linea: con varias, ^FB envuelve de verdad.
+    if lines == 1:
+        text = _fit(text, width, cmd, font[1])
     return "^FO%d,%d^%s,%d,%d^FB%d,%d,1,%s^FD%s^FS" % (
         x, y, cmd, font[0], font[1], width, lines, align, _zpl_safe(text))
 
