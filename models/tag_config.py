@@ -162,6 +162,78 @@ class ProductCategory(models.Model):
             cat.yag_tag_lineas = len(lineas.filtered("cell_id"))
 
 
+class YagTagOverride(models.Model):
+    """One cell of one model, printing something other than what its family prints.
+
+    Why a piece needs to disagree with its family
+    ---------------------------------------------
+    The family setup (`yag.tag.line`) is right for the family and wrong for the odd
+    piece: a necklace in the Pearl branch prints the pearl type in the second cell
+    because that is what the other four hundred pearls carry, and the one piece that
+    has no pearl type but does have a gemstone printed that cell empty. Until now the
+    only way out was to change the cell for all four hundred.
+
+    So the override is per CELL, not per tag: the cells nobody touched keep following
+    the family, and a branch that gets reorganised still reaches every piece except the
+    one spot somebody deliberately moved.
+
+    Why it hangs off the TEMPLATE and not off the variant
+    -----------------------------------------------------
+    Two reasons, and the second is the one that bites. First, what the tag prints comes
+    from attributes that mostly live on the template: the gemological ones are
+    `no_variant`, so they never hang off the variant at all. Second, adding a value to a
+    variant-generating attribute makes Odoo ARCHIVE the live variants and create new
+    ones -- the same trap `ProductTemplateAttributeLine` guards against below -- and an
+    override stored on the variant would disappear with it, silently, leaving the tag
+    quietly back on the family setup with nobody told.
+
+    An empty `attribute_id` is a decision, not a blank record: it means this cell prints
+    NOTHING on this model, which is the way to free a spot the family fills with
+    something that does not apply here.
+    """
+    _name = "yag.tag.override"
+    _description = "Tag cell override for one product model"
+    _order = "cell_id, id"
+
+    product_tmpl_id = fields.Many2one(
+        "product.template", required=True, ondelete="cascade", index=True)
+    cell_id = fields.Many2one(
+        "yag.tag.cell", string="Tag cell", required=True, ondelete="cascade",
+        help="The cell whose content this model changes.")
+    attribute_id = fields.Many2one(
+        "product.attribute", string="Prints instead",
+        help="What this cell reads on this model. Leave it empty for the cell to print "
+             "nothing here, which is how a spot the family fills is freed up.")
+
+    # Odoo 19 declares SQL constraints as class attributes: `_sql_constraints` is not
+    # honoured any more and fails SILENTLY -- see the note on `yag.tag.line`.
+    _cell_por_modelo = models.Constraint(
+        "unique(product_tmpl_id, cell_id)",
+        "That cell already has an override on this model.",
+    )
+
+
+class ProductTemplate(models.Model):
+    _inherit = "product.template"
+
+    yag_tag_override_ids = fields.One2many(
+        "yag.tag.override", "product_tmpl_id", string="Tag cell overrides")
+
+    def _yag_tag_overrides(self):
+        """`{cell code: attribute name or None}` for this model.
+
+        A key that is present with a value of None is NOT the same as a missing key: the
+        first says "this model prints nothing here", the second says "this model has no
+        opinion, follow the family". Collapsing the two would make an emptied cell fall
+        back to the family setup, which is exactly what somebody emptying it did not want.
+        """
+        if not self:
+            return {}
+        self.ensure_one()
+        return {ov.cell_id.code: (ov.attribute_id.name or None)
+                for ov in self.yag_tag_override_ids if ov.cell_id}
+
+
 class ProductTemplateAttributeLine(models.Model):
     """The guard against the silent archiving.
 

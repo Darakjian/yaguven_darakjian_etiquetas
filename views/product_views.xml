@@ -48,6 +48,34 @@
                                    context="{'default_attribute_id': attribute_id}"/>
                         </list>
                     </field>
+                    <!-- The odd piece that has to disagree with its family. Kept
+                         BELOW the attributes on purpose: nine times out of ten an empty
+                         cell means a value was never loaded, and that is fixed just
+                         above. Changing what the cell reads is the exception, and it
+                         reads like one. -->
+                    <separator string="Cells changed on this model"
+                               groups="stock.group_stock_manager"/>
+                    <div class="text-muted" groups="stock.group_stock_manager">
+                        Only for the piece that does not fit its family. A cell listed
+                        here stops following the family setup and prints the attribute
+                        chosen, on every version of this model. Leave the attribute empty
+                        for the cell to print nothing at all.
+                        <br/>
+                        A cell that is NOT listed here keeps following its family, which
+                        is set up per category and reaches every piece in the branch.
+                    </div>
+                    <field name="tag_override_ids" nolabel="1"
+                           groups="stock.group_stock_manager">
+                        <list editable="bottom">
+                            <field name="cell_id"/>
+                            <field name="attribute_id"/>
+                        </list>
+                    </field>
+                    <div groups="stock.group_stock_manager">
+                        <button type="object" class="btn-link ps-0"
+                                name="action_open_category_tag_setup"
+                                string="Open the tag setup of this family"/>
+                    </div>
                     <group string="Identity block">
                         <group>
                             <field name="default_code" string="SKU" readonly="1"/>

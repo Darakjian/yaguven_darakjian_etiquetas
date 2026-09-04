@@ -484,6 +484,13 @@ class ProductProduct(models.Model):
     tag_attribute_line_ids = fields.One2many(
         related="product_tmpl_id.attribute_line_ids", readonly=False,
         string="Attributes of this model")
+    # The cells this model prints differently from its family. Editing them from the
+    # variant form and not only from the template is deliberate: the piece in hand is
+    # where somebody notices that a cell says the wrong thing, and sending them to look
+    # for the model first is how a two-second fix turns into something nobody does.
+    tag_override_ids = fields.One2many(
+        related="product_tmpl_id.yag_tag_override_ids", readonly=False,
+        string="Cells changed on this model")
 
     def _get_attribute_map(self):
         """The piece's attributes, combining template and variant.
@@ -561,13 +568,21 @@ class ProductProduct(models.Model):
         """The tab, told for the piece in hand rather than in jewellery captions."""
         self.ensure_one()
         slots = self._get_family_slots() or {}
+        overrides = self.product_tmpl_id._yag_tag_overrides()
         attr_map = self._get_attribute_map()
         filas = []
         for cell in self.env["yag.tag.cell"].search([]):
             clave, titulo = cell.code, cell.name
             candidatos = slots.get(clave)
             valor = cells.get(clave) or ""
-            if candidatos:
+            # An overridden cell says so IN WORDS, not by a colour or an icon: whoever
+            # reads this tab next has to be able to tell a cell that came out empty
+            # because the attribute is missing from one that is empty because somebody
+            # emptied it on purpose. Those two look identical on paper.
+            if clave in overrides:
+                lee = overrides[clave] or "nothing"
+                lee = "%s &mdash; set on this model" % lee
+            elif candidatos:
                 lee = next((a for a in candidatos if attr_map.get(a)), candidatos[0])
             else:
                 lee = DEFECTO_ATTR.get(clave, "")
@@ -627,11 +642,20 @@ class ProductProduct(models.Model):
             value = self._first_of(attr_map, candidates)
             if value:
                 cells[cell] = value
+        # The model's own overrides go LAST and, unlike the family, they are not
+        # conditional: what somebody chose for this cell is what comes out, and if that
+        # attribute carries no value the cell prints EMPTY instead of falling back.
+        # Falling back would be the worse behaviour by far -- the person changed the cell,
+        # the tag kept showing the old datum, and nothing on screen explained why.
+        for cell, attribute in self.product_tmpl_id._yag_tag_overrides().items():
+            cells[cell] = attr_map.get(attribute, "") if attribute else ""
         return cells
 
     @api.depends("product_template_attribute_value_ids",
                  "product_tmpl_id.attribute_line_ids.value_ids",
-                 "categ_id", "categ_id.yag_tag_line_ids")
+                 "categ_id", "categ_id.yag_tag_line_ids",
+                 "product_tmpl_id.yag_tag_override_ids.cell_id",
+                 "product_tmpl_id.yag_tag_override_ids.attribute_id")
     def _compute_label_cells(self):
         """Each cell to its own field, straight off the same dictionary the tag is built
         from. An empty cell stays empty here too -- that is the fixed-slot rule of the
@@ -649,6 +673,26 @@ class ProductProduct(models.Model):
             record.label_tabla = record._label_tabla_html(cells)
             slots = record._get_family_slots()
             record.label_slots_note = False
+
+    def action_open_category_tag_setup(self):
+        """Open the tag setup THIS piece actually obeys.
+
+        Not its own category: the one the setup is inherited from, which is where the
+        lines really live. Sending someone to a leaf category with no lines of its own --
+        the usual case, since 14 to 16 branches cover the whole catalogue -- shows them an
+        empty page and reads as "there is nothing configured here".
+        """
+        self.ensure_one()
+        origen, _config = self.categ_id._yag_tag_config()
+        categoria = origen or self.categ_id
+        return {
+            "type": "ir.actions.act_window",
+            "name": categoria.display_name or "Tag setup",
+            "res_model": "product.category",
+            "res_id": categoria.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
     def get_jewelry_label_zpl(self):
         self.ensure_one()
