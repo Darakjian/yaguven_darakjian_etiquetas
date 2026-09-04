@@ -278,24 +278,48 @@ class ProductTemplateAttributeLine(models.Model):
             [("product_id", "in", variantes.ids)], ["product_id"], ["product_id"])}
         return con_stock | variantes.filtered(lambda v: v.id in movidas_ids)
 
-    @api.constrains("value_ids")
-    def _yag_check_archivado_silencioso(self):
+    def write(self, vals):
+        """Check on the way out, not on the way in.
+
+        An @api.constrains does not work here: it runs inside the model's own write,
+        while Odoo recomputes the variants afterwards, from
+        product.template._create_variant_ids. Measured on production 2026-09-04 with a
+        product carrying stock and a movement: the constrains saw everything still alive
+        and let through the very write that archived the live piece.
+
+        So the pieces at risk are captured before, super() lets the recompute happen, and
+        only then do we look. Raising here rolls the whole write back.
+        """
+        if "value_ids" not in vals:
+            return super().write(vals)
+
+        antes = {}
         for line in self:
             if line.attribute_id.create_variant != "always":
                 continue
-            # Odoo has already recomputed the variants by the time this runs, so the check
-            # reads the outcome instead of predicting it: anything holding stock or
-            # movements that came out archived is a piece that just lost its own history.
-            perdidas = line._yag_variantes_con_historia().filtered(lambda v: not v.active)
+            riesgo = line._yag_variantes_con_historia()
+            if riesgo:
+                antes[line.id] = (line.attribute_id.name,
+                                  {v.id: v.default_code or v.display_name for v in riesgo})
+
+        res = super().write(vals)
+
+        for line_id, (attr_name, piezas) in antes.items():
+            variantes = self.env["product.product"].with_context(
+                active_test=False).browse(list(piezas)).exists()
+            # Gone entirely, or still there but archived: both mean the piece lost the
+            # variant that carried its code, its stock and its movements.
+            borradas = set(piezas) - set(variantes.ids)
+            archivadas = {v.id for v in variantes if not v.active}
+            perdidas = borradas | archivadas
             if perdidas:
                 raise ValidationError(
-                    "Changing '%s' leaves these pieces archived, and they carry stock or "
-                    "movements: %s.\n\n"
-                    "Their code, their stock and their history would stay on the archived "
-                    "variant, and the shop would find them at zero. Adding a value is "
-                    "safe; what breaks the link is replacing or removing one that a live "
-                    "piece is using. Move the stock out first, or keep the new version as "
-                    "its own product."
-                    % (line.attribute_id.name,
-                       ", ".join(perdidas.mapped(
-                           lambda v: v.default_code or v.display_name))))
+                    "Changing '%s' leaves these pieces without their variant, and they "
+                    "carry stock or movements: %s.\n\n"
+                    "Their code, their stock and their history would stay behind on a "
+                    "variant nobody can see, and the shop would find them at zero. Adding "
+                    "a value is safe; what breaks the link is replacing or removing one "
+                    "that a live piece is using. Move the stock out first, or keep the new "
+                    "version as its own product."
+                    % (attr_name, ", ".join(sorted(piezas[i] for i in perdidas))))
+        return res
