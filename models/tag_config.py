@@ -244,9 +244,11 @@ class ProductTemplateAttributeLine(models.Model):
     what breaks is that the shop looks for the piece and finds it at zero. Nothing warns.
 
         no_variant, any number of values -> variants untouched, no risk
-        ADDING a value                   -> the existing combinations stay valid, so the
+        ADDING a value to a live line    -> the existing combinations stay valid, so the
                                             live variant survives with its id and its code
         REPLACING or REMOVING a value    -> that combination is gone: Odoo archives it
+        OPENING a new attribute line     -> every existing combination needs a value it
+                                            does not have: same archiving
 
     The first version of this guard refused any second value on a variant-generating
     attribute whenever the variant held stock or had moved. That reads the risk from the
@@ -255,71 +257,79 @@ class ProductTemplateAttributeLine(models.Model):
     and stayed silent about the case that does break the link.
 
     So it no longer predicts: it lets Odoo recompute and then looks at the result, asking
-    whether a variant holding stock or movements was left archived. Raising rolls the whole
-    write back, which is what makes checking afterwards both safe and exact.
+    whether a variant holding stock or movements was left without its variant. Raising
+    rolls the whole thing back, which is what makes checking afterwards both safe and
+    exact.
     """
     _inherit = "product.template.attribute.line"
 
-    def _yag_variantes_con_historia(self):
-        """The variants of this template that hold stock or have already moved.
+    @api.model
+    def _yag_capturar(self, tmpl_ids):
+        """The pieces at risk on these templates, before touching anything.
 
-        Archived ones included on purpose: the whole point is to catch the variant that
-        the recompute has just archived.
+        Returns {variant id: label}. Only variants that hold stock or have already moved
+        are worth protecting: an empty one that gets archived loses nothing.
         """
-        self.ensure_one()
-        variantes = self.product_tmpl_id.with_context(
-            active_test=False).product_variant_ids
+        tmpl_ids = [t for t in tmpl_ids if t]
+        if not tmpl_ids:
+            return {}
+        variantes = self.env["product.product"].with_context(active_test=False).search(
+            [("product_tmpl_id", "in", tmpl_ids)])
         if not variantes:
-            return variantes.browse()
+            return {}
         con_stock = variantes.filtered(lambda v: v.qty_available)
         # One read_group instead of one query per variant: this runs on every save of an
         # attribute line, and a model with thirteen colours would be thirteen queries.
         movidas_ids = {g["product_id"][0] for g in self.env["stock.move.line"].read_group(
             [("product_id", "in", variantes.ids)], ["product_id"], ["product_id"])}
-        return con_stock | variantes.filtered(lambda v: v.id in movidas_ids)
+        riesgo = con_stock | variantes.filtered(lambda v: v.id in movidas_ids)
+        return {v.id: (v.default_code or v.display_name) for v in riesgo}
+
+    @api.model
+    def _yag_verificar(self, antes):
+        """Did any of those pieces lose its variant? Raising rolls the whole thing back."""
+        if not antes:
+            return
+        variantes = self.env["product.product"].with_context(
+            active_test=False).browse(list(antes)).exists()
+        # Gone entirely, or still there but archived: either way the piece lost the
+        # variant that carried its code, its stock and its movements.
+        perdidas = (set(antes) - set(variantes.ids)) | {v.id for v in variantes if not v.active}
+        if perdidas:
+            raise ValidationError(
+                "This change leaves these pieces without their variant, and they carry "
+                "stock or movements: %s.\n\n"
+                "Their code, their stock and their history would stay behind on a variant "
+                "nobody can see, and the shop would find them at zero. Adding a value to "
+                "an existing attribute is safe; what breaks the link is replacing or "
+                "removing one that a live piece is using, or opening a new attribute on a "
+                "template that already has pieces. Move the stock out first, or keep the "
+                "new version as its own product."
+                % ", ".join(sorted(antes[i] for i in perdidas)))
+
+    # The three doors that reach _create_variant_ids. An @api.constrains covers none of
+    # them properly: it runs inside the model's own write, while Odoo recomputes the
+    # variants afterwards, so it sees everything still alive and lets the damage through
+    # (measured on production 2026-09-04 with a product carrying stock and a movement).
+    # Capture before, let super() recompute, then look at what actually happened.
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        antes = self._yag_capturar([v.get("product_tmpl_id") for v in vals_list])
+        lineas = super().create(vals_list)
+        self._yag_verificar(antes)
+        return lineas
 
     def write(self, vals):
-        """Check on the way out, not on the way in.
-
-        An @api.constrains does not work here: it runs inside the model's own write,
-        while Odoo recomputes the variants afterwards, from
-        product.template._create_variant_ids. Measured on production 2026-09-04 with a
-        product carrying stock and a movement: the constrains saw everything still alive
-        and let through the very write that archived the live piece.
-
-        So the pieces at risk are captured before, super() lets the recompute happen, and
-        only then do we look. Raising here rolls the whole write back.
-        """
-        if "value_ids" not in vals:
+        if not ({"value_ids", "attribute_id", "product_tmpl_id"} & set(vals)):
             return super().write(vals)
-
-        antes = {}
-        for line in self:
-            if line.attribute_id.create_variant != "always":
-                continue
-            riesgo = line._yag_variantes_con_historia()
-            if riesgo:
-                antes[line.id] = (line.attribute_id.name,
-                                  {v.id: v.default_code or v.display_name for v in riesgo})
-
+        antes = self._yag_capturar(self.product_tmpl_id.ids)
         res = super().write(vals)
+        self._yag_verificar(antes)
+        return res
 
-        for line_id, (attr_name, piezas) in antes.items():
-            variantes = self.env["product.product"].with_context(
-                active_test=False).browse(list(piezas)).exists()
-            # Gone entirely, or still there but archived: both mean the piece lost the
-            # variant that carried its code, its stock and its movements.
-            borradas = set(piezas) - set(variantes.ids)
-            archivadas = {v.id for v in variantes if not v.active}
-            perdidas = borradas | archivadas
-            if perdidas:
-                raise ValidationError(
-                    "Changing '%s' leaves these pieces without their variant, and they "
-                    "carry stock or movements: %s.\n\n"
-                    "Their code, their stock and their history would stay behind on a "
-                    "variant nobody can see, and the shop would find them at zero. Adding "
-                    "a value is safe; what breaks the link is replacing or removing one "
-                    "that a live piece is using. Move the stock out first, or keep the new "
-                    "version as its own product."
-                    % (attr_name, ", ".join(sorted(piezas[i] for i in perdidas))))
+    def unlink(self):
+        antes = self._yag_capturar(self.product_tmpl_id.ids)
+        res = super().unlink()
+        self._yag_verificar(antes)
         return res
