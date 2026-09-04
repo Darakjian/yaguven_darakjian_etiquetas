@@ -80,7 +80,11 @@ class YagProductWizard(models.TransientModel):
         self.line_ids = [(0, 0, {
             "attribute_id": linea.attribute_id.id,
             "sequence": linea.sequence,
-            "slot": linea.slot,
+            # La casilla dejo de ser un texto en la linea y paso a ser un registro
+            # (`yag.tag.cell`) el 2026-08-31: esta lectura quedo apuntando al campo viejo
+            # y reventaba el onchange -- el wizard entero, que es la pantalla por la que la
+            # tienda carga cada pieza.
+            "slot": linea.cell_id.name or "",
             "admite_varios": linea.admite_varios,
             "obligatorio": linea.obligatorio,
         }) for linea in config.sorted("sequence")]
