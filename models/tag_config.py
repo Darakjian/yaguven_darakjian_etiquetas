@@ -237,28 +237,38 @@ class ProductTemplate(models.Model):
 class ProductTemplateAttributeLine(models.Model):
     """The guard against the silent archiving.
 
-    Measured and written down on 2026-08-20, then hit again while loading watches: what
-    matters when touching the attributes of a template with a live variant is NOT whether
-    the product has stock but how many values the line carries.
+    Measured 2026-08-20, corrected 2026-09-04. What loses track of a piece is not a line
+    that carries two values: it is a live variant whose COMBINATION stops existing. Odoo
+    then archives it and creates fresh ones, and the code, the stock and the movements
+    stay on the archived variant. Accounting still balances and the QA on amounts passes;
+    what breaks is that the shop looks for the piece and finds it at zero. Nothing warns.
 
         no_variant, any number of values -> variants untouched, no risk
-        always with ONE value            -> one combination, Odoo updates in place
-        always with TWO OR MORE          -> ARCHIVES the live variant and creates others
+        ADDING a value                   -> the existing combinations stay valid, so the
+                                            live variant survives with its id and its code
+        REPLACING or REMOVING a value    -> that combination is gone: Odoo archives it
 
-    In that third case the code, the stock and the movements stay on the ARCHIVED variant.
-    Accounting still balances and the QA on amounts passes; what breaks is that the shop
-    looks for the piece and finds it at zero. Nothing warns.
+    The first version of this guard refused any second value on a variant-generating
+    attribute whenever the variant held stock or had moved. That reads the risk from the
+    wrong place: it blocked regrouping two pieces that v16 kept under one product (checked
+    on production 2026-09-04 with a throwaway product: the live variant came out untouched)
+    and stayed silent about the case that does break the link.
 
-    So a second value on a variant-generating attribute is refused when the variant
-    carries stock or has moved. It is not a matter of taste: it is the one operation on
-    this screen that can lose track of a physical piece.
+    So it no longer predicts: it lets Odoo recompute and then looks at the result, asking
+    whether a variant holding stock or movements was left archived. Raising rolls the whole
+    write back, which is what makes checking afterwards both safe and exact.
     """
     _inherit = "product.template.attribute.line"
 
     def _yag_variantes_con_historia(self):
-        """The variants of this template that hold stock or have already moved."""
+        """The variants of this template that hold stock or have already moved.
+
+        Archived ones included on purpose: the whole point is to catch the variant that
+        the recompute has just archived.
+        """
         self.ensure_one()
-        variantes = self.product_tmpl_id.product_variant_ids
+        variantes = self.product_tmpl_id.with_context(
+            active_test=False).product_variant_ids
         if not variantes:
             return variantes.browse()
         con_stock = variantes.filtered(lambda v: v.qty_available)
@@ -273,16 +283,19 @@ class ProductTemplateAttributeLine(models.Model):
         for line in self:
             if line.attribute_id.create_variant != "always":
                 continue
-            if len(line.value_ids) < 2:
-                continue
-            riesgo = line._yag_variantes_con_historia()
-            if riesgo:
+            # Odoo has already recomputed the variants by the time this runs, so the check
+            # reads the outcome instead of predicting it: anything holding stock or
+            # movements that came out archived is a piece that just lost its own history.
+            perdidas = line._yag_variantes_con_historia().filtered(lambda v: not v.active)
+            if perdidas:
                 raise ValidationError(
-                    "'%s' would open versions of this model, and Odoo does that by "
-                    "archiving the live variant and creating one per combination. These "
-                    "carry stock or movements and would be left archived, with the piece "
-                    "showing as zero at the counter: %s.\n\n"
-                    "If the model really has to open versions, move the stock out first "
-                    "or create the new version as its own product."
+                    "Changing '%s' leaves these pieces archived, and they carry stock or "
+                    "movements: %s.\n\n"
+                    "Their code, their stock and their history would stay on the archived "
+                    "variant, and the shop would find them at zero. Adding a value is "
+                    "safe; what breaks the link is replacing or removing one that a live "
+                    "piece is using. Move the stock out first, or keep the new version as "
+                    "its own product."
                     % (line.attribute_id.name,
-                       ", ".join(riesgo.mapped(lambda v: v.default_code or v.display_name))))
+                       ", ".join(perdidas.mapped(
+                           lambda v: v.default_code or v.display_name))))
