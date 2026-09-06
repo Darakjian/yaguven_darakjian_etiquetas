@@ -183,11 +183,17 @@ class YagProductWizardLine(models.TransientModel):
 
     wizard_id = fields.Many2one("yag.product.wizard", required=True, ondelete="cascade")
     sequence = fields.Integer("Sequence", default=10)
-    attribute_id = fields.Many2one("product.attribute", required=True, readonly=True)
+    # None of these four is `readonly=True` on the field, and that is deliberate: from 17
+    # on, the web client leaves a field the MODEL declares readonly out of the payload it
+    # sends. The lines here are born in an onchange on the client, so their attribute_id
+    # never reached the server and the create died on `required=True` -- the wizard could
+    # not save a single product. The person still must not type over them: the view marks
+    # them `readonly="1" force_save="1"`, which locks the cell and keeps the value.
+    attribute_id = fields.Many2one("product.attribute", required=True)
     value_ids = fields.Many2many("product.attribute.value", string="Value")
-    admite_varios = fields.Boolean("Several values allowed", readonly=True)
-    obligatorio = fields.Boolean("Required", readonly=True)
-    slot = fields.Char("Tag cell", readonly=True)
+    admite_varios = fields.Boolean("Several values allowed")
+    obligatorio = fields.Boolean("Required")
+    slot = fields.Char("Tag cell")
 
     @api.constrains("value_ids", "admite_varios")
     def _check_varios(self):
