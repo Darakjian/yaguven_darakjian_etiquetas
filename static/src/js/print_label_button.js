@@ -4,6 +4,7 @@ import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
 import { Component, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 
 // 127.0.0.1 y NO "localhost": en macOS "localhost" resuelve primero a ::1 (IPv6) y el
 // bridge only listens on IPv4 (`ZBRIDGE_LISTEN_HOST` defaults to 127.0.0.1). Verified on
@@ -19,6 +20,7 @@ class PrintJewelryLabelButton extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this.dialog = useService("dialog");
         this.state = useState({ printing: false });
     }
 
@@ -39,6 +41,36 @@ class PrintJewelryLabelButton extends Component {
                 "get_jewelry_label_zpl",
                 [[resId]]
             );
+            // HOW MANY TAGS ARE IN THERE. A receipt sends the whole list in one stream,
+            // one ^XA...^XZ per unit, so counting the openings counts the tags -- no
+            // second round trip to ask. One tag prints with no question, as it always
+            // has; several are worth confirming, because a distracted click on a receipt
+            // of 49 lines empties the roll.
+            const cuantas = (zpl.match(/\^XA/g) || []).length;
+            if (cuantas === 0) {
+                this.notification.add(
+                    _t("There is nothing to print here yet: no unit has been received."),
+                    { type: "warning" }
+                );
+                return;
+            }
+            if (cuantas > 1) {
+                const seguir = await new Promise((resolve) => {
+                    this.dialog.add(ConfirmationDialog, {
+                        title: _t("Print tags"),
+                        body: _t(
+                            "%s tags are about to be printed, one per unit received.",
+                            cuantas
+                        ),
+                        confirmLabel: _t("Print"),
+                        confirm: () => resolve(true),
+                        cancel: () => resolve(false),
+                    });
+                });
+                if (!seguir) {
+                    return;
+                }
+            }
             // The tag goes to the chatter whether or not the printer answers. Away from
             // the counter, or on a tablet, seeing what the tag would say is worth as much
             // as printing it -- and the chatter entry says which of the two happened.
@@ -59,7 +91,9 @@ class PrintJewelryLabelButton extends Component {
             }
             this.notification.add(
                 impreso
-                    ? _t("Tag sent to the Zebra printer")
+                    ? (cuantas > 1
+                        ? _t("%s tags sent to the Zebra printer", cuantas)
+                        : _t("Tag sent to the Zebra printer"))
                     : _t("The printer did not answer. The tag is in the chatter: %s", fallo),
                 { type: impreso ? "success" : "warning" }
             );
