@@ -1,6 +1,6 @@
 {
     "name": "Darakjian - Zebra Tag Printing",
-    "version": "19.0.19.5.0",
+    "version": "19.0.19.6.0",
     "summary": "Print jewelry tags on Zebra printers straight from the browser",
     "category": "Inventory",
     "author": "Yaguven C.G.",
@@ -13,6 +13,7 @@
         "views/guided_create_views.xml",
         "views/purchase_guided_views.xml",
         "views/product_views.xml",
+        "views/stock_lot_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

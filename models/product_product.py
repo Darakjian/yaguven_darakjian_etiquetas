@@ -8,6 +8,7 @@ from markupsafe import Markup
 from PIL import Image, ImageDraw
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.tools.misc import html_escape
 
 _logger = logging.getLogger(__name__)
@@ -306,6 +307,34 @@ PRICE_SAFETY = 5         # air between the foot of the price and the die-cut
 Y_SKU = Y_TOP + 2
 Y_PRICE = PAPER_CUT_DOTS - PRICE_SAFETY - FONT_PRICE[0]      # 78
 
+# --- EL NUMERO DE SERIE, A LA DERECHA DEL PRECIO (2026-09-07) ----------------
+# Gabriel, por el grupo: "el precio a la izquierda, fijate si se puede agrandar un poquito
+# mas el serial". So the price keeps the column it has always had and the serial closes
+# against the right-hand end of the paddle, with the two resting on the SAME baseline.
+#
+# IT CARRIES NO "S/N" CAPTION. Measured on v19's longest real serial (LG7355294371), the
+# caption costs 19 dots -- exactly the difference between printing the number in the
+# price's own body size and printing it two steps smaller. The SKU sits above it in a
+# different font, so there is nothing to confuse it with.
+SERIAL_RIGHT = CONTENT_WIDTH_DOTS - 8   # 347: closes 8 dots before the paddle/tail step
+# 8 DECLARED IS ABOUT 10 REAL: `_ink_width_dots` adds up ADVANCES, and an advance carries
+# the sidebearing that the last character of a run never actually paints, so the arithmetic
+# runs 0.8 to 2.7 dots long. The margin is left on the safe side on purpose -- the cost of
+# being wrong here is two blocks of ink touching on a tag nobody can reprint cheaply.
+SERIAL_AIR = 8                          # least air between the price's ink and the serial
+
+# Body sizes from largest to smallest: the FIRST one that fits is taken. Run over all 1.082
+# serials in v19 against each product's real price: 95,0% print in the price's own size, and
+# the 1,3% that do not fit even in the smallest are records holding TWO serials in one field
+# ("2136559910 / 5136561117") -- a data problem, not a layout one.
+SERIAL_STEPS = ((24, 14), (21, 12), (19, 11), (17, 10))
+
+# THE PRICE IS CONDENSED ONLY WHEN THERE IS A SERIAL. Going from declared width 18 to 14
+# frees the 21 dots the number needs to stay in the big size. With no serial nothing moves:
+# a tag for an unserialised product comes out exactly as it does today, which is what keeps
+# the 15.040 products without tracking out of this change.
+FONT_PRICE_SERIAL = (24, 14)
+
 # THE DESCRIPTION HANGS OFF THE TAIL, NOT OFF THE GAP (2026-08-06). It used to be centred
 # in the free space between the SKU and the price, which is a PADDLE criterion -- and the
 # description is the one field that leaves the paddle and continues over the tail. With the
@@ -387,29 +416,54 @@ ADVANCE_BY_FONT = {
 }
 
 
-def _text_width_dots(text, cmd, width_param):
-    """Ancho que va a ocupar `text` en el papel. None si esa fuente no esta medida."""
+def _ink_width_dots(text, cmd, width_param):
+    """The dots the INK will take, with no safety margin added. None if unmeasurable.
+
+    A0N ADVANCES IN PROPORTION TO THE DECLARED WIDTH, so one measured table covers every
+    size. Verified on 2026-09-08 against Labelary for widths 10 to 18: each character's
+    advance divided by the declared width gives the same constant (0.48 for a digit, 0.55
+    for an 'A'), and the height plays no part -- (20,12) and (21,12) measure identically.
+    Below 10 the font stops shrinking, which is why 7 to 10 share a table.
+
+    Checked against 16 real v19 serials at (24,14): the arithmetic OVERSTATES the width by
+    0.8 to 2.7 dots and never understates it, which is the safe side for deciding what fits.
+    """
     adv = ADVANCE_BY_FONT.get((cmd, width_param))
+    factor = 1.0
     if adv is None:
-        return None
+        if cmd != "A0N" or width_param < 7:
+            return None
+        adv, factor = ADV_A0N_NARROW, max(width_param, 10) / 10.0
     if isinstance(adv, float):
-        return len(text) * adv + FIELD_START_DOTS
-    return sum(adv.get(ch, adv["n"]) for ch in text) + FIELD_START_DOTS
+        return len(text) * adv * factor
+    return sum(adv.get(ch, adv["n"]) for ch in text) * factor
 
 
-def _fit(text, box, cmd, width_param):
+def _text_width_dots(text, cmd, width_param):
+    """Ancho que va a ocupar `text` en el papel. None si esa fuente no esta medida.
+
+    Carries FIELD_START_DOTS on top of the ink: it is the cushion used to decide a TRIM,
+    where erring long only costs a character. To place one field against another use
+    `_ink_width_dots` -- adding 12 dots of cushion there would push the serial down a body
+    size for no reason.
+    """
+    ancho = _ink_width_dots(text, cmd, width_param)
+    return None if ancho is None else ancho + FIELD_START_DOTS
+
+
+def _fit(text, box, cmd, width_param, medida=_text_width_dots):
     """Corte seco al ultimo caracter que entra en `box` dots.
 
     Seco y no por palabra: en una casilla de 76 dots entran unos 13 caracteres, y cortar
     por palabra entera deja la casilla VACIA cada vez que la primera palabra ya no entra.
     Preferimos un valor cortado y legible antes que una casilla en blanco.
     """
-    ancho = _text_width_dots(text, cmd, width_param)
+    ancho = medida(text, cmd, width_param)
     if ancho is None or ancho <= box:
         return text
     out = ""
     for ch in text:
-        if _text_width_dots(out + ch, cmd, width_param) > box:
+        if medida(out + ch, cmd, width_param) > box:
             break
         out += ch
     return out.rstrip()
@@ -694,8 +748,17 @@ class ProductProduct(models.Model):
             "target": "current",
         }
 
-    def get_jewelry_label_zpl(self):
+    def get_jewelry_label_zpl(self, serial=None):
+        """The tag's ZPL. `serial` is the number of the PIECE, not of the model.
+
+        It arrives as an argument instead of being read here because the same tag is
+        printed from two places: the piece's own record, which knows its serial, and the
+        product's, which has to look it up in stock first. What the drawing needs is the
+        number; where it came from is the caller's business.
+        """
         self.ensure_one()
+        if serial is None:
+            serial = self._label_serial_from_stock()
         cells = self._get_label_cells()
 
         zpl = ["^XA^PW%d^LL%d" % (CANVAS_WIDTH_DOTS, LABEL_HEIGHT_DOTS)]
@@ -712,10 +775,68 @@ class ProductProduct(models.Model):
         zpl.append(_field(COL_X, Y_SKU, FONT_SKU, self.default_code or "", COL_W,
                           cmd=FONT_SKU_CMD))
         zpl.append(_field(COL_X, Y_DESC, FONT_DESC, self.name or "", COL_W))
-        zpl.append(_field(COL_X, Y_PRICE, FONT_PRICE,
-                          "$ {:,.2f}".format(self.lst_price), COL_W))
+        precio = "$ {:,.2f}".format(self.lst_price)
+        fuente_precio = FONT_PRICE_SERIAL if serial else FONT_PRICE
+        zpl.append(_field(COL_X, Y_PRICE, fuente_precio, precio, COL_W))
+        if serial:
+            zpl.append(self._serial_field(serial, precio, fuente_precio))
         zpl.append("^XZ")
         return "".join(zpl)
+
+    def _label_serial_from_stock(self):
+        """The serial to print when the tag is asked for from the MODEL, not the piece.
+
+        Only a product tracked by serial has one. With exactly ONE piece on hand there is
+        nothing to ask -- that is the piece. With several, guessing would put somebody
+        else's number on this tag, so it stops and says to print from the piece, which is
+        the same record the number was typed into when the goods came in.
+
+        With none on hand it prints with no serial: a tag for a piece that has not arrived
+        yet is a legitimate thing to want, and it comes out exactly as it does today.
+        """
+        self.ensure_one()
+        if self.tracking != "serial":
+            return None
+        lotes = self.env["stock.quant"].search([
+            ("product_id", "=", self.id),
+            ("location_id.usage", "=", "internal"),
+            ("quantity", ">", 0),
+            ("lot_id", "!=", False),
+        ]).mapped("lot_id")
+        if len(lotes) > 1:
+            raise UserError(_(
+                "This model has %s pieces on hand, each one with its own serial number. "
+                "Open the piece you are holding and print its tag from there, so the "
+                "number on the tag is the number on the piece.", len(lotes)))
+        return lotes.name if lotes else None
+
+    def _serial_field(self, serial, precio, fuente_precio):
+        """The serial, closing against SERIAL_RIGHT and level with the price's foot.
+
+        The body size is not fixed: it is the largest of SERIAL_STEPS that still leaves
+        SERIAL_AIR between the two blocks of ink. That way the 94% of serials that fit
+        print in the big size Gabriel asked for, and the long tail -- v19 holds a few of
+        25 characters -- steps down instead of running into the price.
+
+        The box runs to SERIAL_RIGHT so that ^FB's right alignment lands there. The trim,
+        when even the smallest size does not fit, is ours and against the FREE space: ^FB
+        does not trim, it stacks the overflow on top of itself.
+        """
+        serial = _zpl_safe(serial).strip()
+        if not serial:
+            return ""
+        libre = (SERIAL_RIGHT - COL_X
+                 - _ink_width_dots(precio, "A0N", fuente_precio[1]) - SERIAL_AIR)
+        alto, ancho = SERIAL_STEPS[-1]
+        for alto, ancho in SERIAL_STEPS:
+            if _ink_width_dots(serial, "A0N", ancho) <= libre:
+                break
+        else:
+            serial = _fit(serial, libre, "A0N", ancho, medida=_ink_width_dots)
+        # Both blocks rest on the SAME baseline: ^FO is the top edge, so the smaller font
+        # has to start lower by exactly the difference in height.
+        y = Y_PRICE + (fuente_precio[0] - alto)
+        return _field(COL_X, y, (alto, ancho), serial, SERIAL_RIGHT - COL_X, align="R")
 
     # --- CHATTER PREVIEW ----------------------------------------------------
 # Every print is recorded in the variant's chatter with the tag drawn OVER THE DIE-CUT.
@@ -816,15 +937,21 @@ class ProductProduct(models.Model):
         canvas.save(buf, format="PNG")
         return buf.getvalue()
 
-    def _label_preview_attachment(self, zpl):
+    def _label_preview_attachment(self, zpl, destino=None):
         """The preview attachment, cached by the ZPL hash: as long as the tag does not
-        change the render is not requested again, even if it is printed ten times."""
+        change the render is not requested again, even if it is printed ten times.
+
+        `destino` is the record it hangs off, which is not always this variant: a tag
+        printed from a PIECE belongs in that piece's chatter. The cache is per record, so
+        two pieces of the same model render once each -- the tags differ by their serial
+        anyway, and so does the hash."""
         self.ensure_one()
+        destino = destino or self
         digest = hashlib.sha256(zpl.encode("utf8")).hexdigest()[:12]
         fname = "tag_%s_%s.png" % (self.default_code or self.id, digest)
         Att = self.env["ir.attachment"]
-        att = Att.search([("res_model", "=", "product.product"),
-                          ("res_id", "=", self.id), ("name", "=", fname)], limit=1)
+        att = Att.search([("res_model", "=", destino._name),
+                          ("res_id", "=", destino.id), ("name", "=", fname)], limit=1)
         if att:
             return att
         raw = self._labelary_png(zpl)
@@ -832,8 +959,8 @@ class ProductProduct(models.Model):
             return Att
         return Att.create({
             "name": fname,
-            "res_model": "product.product",
-            "res_id": self.id,
+            "res_model": destino._name,
+            "res_id": destino.id,
             "mimetype": "image/png",
             "datas": base64.b64encode(self._draw_die_cut(raw)),
         })
@@ -848,12 +975,22 @@ class ProductProduct(models.Model):
         printed, or only rendered -- so the record stays honest either way.
         """
         self.ensure_one()
-        zpl = self.get_jewelry_label_zpl()
-        att = self._label_preview_attachment(zpl)
+        return self._post_label_to(self, self.get_jewelry_label_zpl(), impreso=impreso)
+
+    def _post_label_to(self, destino, zpl, impreso=True):
+        """Post `zpl`'s tag to `destino`'s chatter.
+
+        The destination is an argument because the same drawing is printed from two
+        places: the variant, and the PIECE with its serial. What was printed is what the
+        entry has to sit on -- looking for the tag of a piece in the model's chatter,
+        among every other piece of that model, is not finding it.
+        """
+        self.ensure_one()
+        att = self._label_preview_attachment(zpl, destino=destino)
 
         cuerpo = "<p><strong>%s</strong> &mdash; %s</p>" % (
             html_escape(_("Tag printed") if impreso else _("Tag preview")),
-            html_escape(self.default_code or self.display_name))
+            html_escape(destino.display_name))
         if not impreso:
             cuerpo += "<p>%s</p>" % html_escape(_(
                 "It did NOT come out of the printer: the bridge did not answer. This is "
@@ -861,7 +998,7 @@ class ProductProduct(models.Model):
         if not att:
             cuerpo += "<p>%s</p>" % html_escape(_(
                 "The preview could not be built (the rendering service did not answer)."))
-        self.message_post(
+        destino.message_post(
             body=Markup(cuerpo),
             message_type="comment",
             subtype_xmlid="mail.mt_note",

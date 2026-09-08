@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- THE TAG, PRINTED FROM THE PIECE. The serial lives here, so this is where the tag
+         that carries it can be printed. It is also the screen where the number and the
+         GIA certificate are typed in as the goods are received: printing in that same
+         movement is the difference between a tag that gets printed and one that waits.
+
+         The native form has no header, so one is added before the sheet, which is the
+         same place the variant's button sits: the two screens then read alike. -->
+    <record id="stock_lot_form_view_print_label" model="ir.ui.view">
+        <field name="name">stock.lot.form.print.jewelry.label</field>
+        <field name="model">stock.lot</field>
+        <field name="inherit_id" ref="stock.view_production_lot_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <widget name="print_jewelry_label" string="Print Tag"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+</odoo>

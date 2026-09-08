@@ -27,10 +27,15 @@ class PrintJewelryLabelButton extends Component {
         if (!resId) {
             return;
         }
+        // THE MODEL IS READ OFF THE RECORD, not hard-coded: the same button prints from
+        // the variant and from the PIECE (`stock.lot`), which is the record that holds
+        // the serial number. Both models answer the same two methods, so nothing here
+        // needs to know which screen it is on -- and a third screen would need no change.
+        const resModel = this.props.record.resModel;
         this.state.printing = true;
         try {
             const zpl = await this.orm.call(
-                "product.product",
+                resModel,
                 "get_jewelry_label_zpl",
                 [[resId]]
             );
@@ -62,7 +67,7 @@ class PrintJewelryLabelButton extends Component {
             // been printed, and saying it was not would be a lie.
             try {
                 await this.orm.call(
-                    "product.product",
+                    resModel,
                     "action_log_printed_label",
                     [[resId], impreso]
                 );
