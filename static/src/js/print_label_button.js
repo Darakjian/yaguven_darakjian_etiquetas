@@ -87,9 +87,17 @@ class PrintJewelryLabelButton extends Component {
                 );
             }
         } catch (error) {
-            this.notification.add(_t("Could not print: %s", error.message), {
-                type: "danger",
-            });
+            // A UserError IS THE ANSWER, not a failure: it is the server saying which
+            // piece to print from. Its text arrives in `data.message` and is dropped if
+            // `error.message` is read instead, which leaves the person with "Odoo Server
+            // Error" and nothing to do about it. Shown on its own, sticky, so there is
+            // time to read which of the pieces to open.
+            const esperado = error?.data?.name?.endsWith("UserError");
+            const detalle = error?.data?.message || error.message;
+            this.notification.add(
+                esperado ? detalle : _t("Could not print: %s", detalle),
+                { type: esperado ? "warning" : "danger", sticky: esperado }
+            );
         } finally {
             this.state.printing = false;
         }
