@@ -140,4 +140,8 @@ class PrintJewelryLabelButton extends Component {
 
 registry.category("view_widgets").add("print_jewelry_label", {
     component: PrintJewelryLabelButton,
+    // The view's `string` does NOT reach the component on its own: a view widget only
+    // receives what `extractProps` hands it. Without this the receipt's button read
+    // "Print Tag" in the singular while it was about to print the whole list.
+    extractProps: ({ attrs }) => ({ string: attrs.string }),
 });
