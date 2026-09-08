@@ -4,6 +4,7 @@
     "summary": "Print jewelry tags on Zebra printers straight from the browser",
     "category": "Inventory",
     "author": "Yaguven C.G.",
+    "website": "https://github.com/Darakjian/yaguven_darakjian_etiquetas",
     "depends": ["product", "stock", "purchase"],
     "data": [
         "security/ir.model.access.csv",
