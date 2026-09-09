@@ -16,8 +16,9 @@ drifts from what the catalog says.
 Odoo runs on **https**; the Zebra speaks **raw socket over http**. The browser blocks any
 direct request as mixed content. The single exception browsers make is
 `http://127.0.0.1`, so a small process has to run **on the machine that has the browser
-open**. That process is `zebra_bridge/zebra_bridge.py`, shared with the POS receipt
-printer — see its own README.
+open**. That process is the bridge in
+[yaguven_darakjian_zebra_bridge](https://github.com/Darakjian/yaguven_darakjian_zebra_bridge), shared with the POS receipt printer —
+see its own README.
 
 ## How the tag is composed
 
