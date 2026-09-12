@@ -57,6 +57,29 @@ class YagProductWizard(models.TransientModel):
     # whole thing exists to prevent.
     purchase_order_id = fields.Many2one("purchase.order", readonly=True)
     aviso = fields.Char("Notice", readonly=True)
+    # What the tag will print empty, said WHILE there is still time to type it.
+    # This used to be a UserError on the way out. That was the wrong place for it: the
+    # person is holding the piece, and a wall at the last click does not get the value
+    # typed -- it gets the load abandoned, or the "Required" flag torn off the category,
+    # which breaks the setup for every piece that comes after. Here it says the same
+    # thing with the form still open, and creating stays possible.
+    aviso_vacias = fields.Char("Empty cells", compute="_compute_aviso_vacias")
+
+    @api.depends("line_ids.value_ids", "line_ids.obligatorio")
+    def _compute_aviso_vacias(self):
+        for wiz in self:
+            vacias = wiz.line_ids.filtered(
+                lambda l: l.obligatorio and not l.value_ids)
+            if vacias:
+                wiz.aviso_vacias = _(
+                    "These cells will print empty on the tag: %s. You can create the "
+                    "product anyway."
+                ) % ", ".join(vacias.mapped("attribute_id.name"))
+            elif wiz.line_ids and not wiz.line_ids.filtered("value_ids"):
+                wiz.aviso_vacias = _("No attribute carries a value: the tag will print "
+                                     "empty. You can create the product anyway.")
+            else:
+                wiz.aviso_vacias = False
 
     @api.onchange("type")
     def _onchange_type(self):
@@ -119,19 +142,12 @@ class YagProductWizard(models.TransientModel):
 
     def action_crear(self):
         self.ensure_one()
-        faltan = self.line_ids.filtered(lambda l: l.obligatorio and not l.value_ids)
-        if faltan:
-            raise UserError(_(
-                "These attributes are required for this family and are empty: %s.\n\n"
-                "They are what identifies the piece on the tag."
-            ) % ", ".join(faltan.mapped("attribute_id.name")))
+        # Nothing here refuses the save any more. An empty cell is announced by
+        # `aviso_vacias` while the form is open and the piece is in the person's hand;
+        # what it must never do is leave them with no way out but to go and untick
+        # "Required" on the category, which is what happened in QA on 2026-09-11 and
+        # takes the requirement away from every piece of that family, not just this one.
         cargadas = self.line_ids.filtered("value_ids")
-        # A family with no setup yet loads with no attributes and that is fine: thirteen
-        # of the fourteen branches are still unconfigured, and refusing them would block
-        # loading almost the whole catalogue. The tag prints empty, which is honest and
-        # exactly what it does today.
-        if self.line_ids and not cargadas:
-            raise UserError(_("No attribute carries a value: the tag would print empty."))
 
         tmpl = self.env["product.template"].create({
             "name": self.name.strip(),
