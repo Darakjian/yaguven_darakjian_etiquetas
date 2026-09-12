@@ -39,7 +39,11 @@
                         belong to the model, so they reach every version of it: that is
                         right for what describes the piece, which is what the tag prints.
                     </div>
-                    <field name="tag_attribute_line_ids" nolabel="1">
+                    <!-- `yag_tag_tab` keeps Odoo from loading every value of an
+                         attribute that does not create variants as soon as it is picked:
+                         here the person types the ONE value of the piece in hand. -->
+                    <field name="tag_attribute_line_ids" nolabel="1"
+                           context="{'yag_tag_tab': True}">
                         <list editable="bottom">
                             <field name="attribute_id"/>
                             <field name="value_ids" widget="many2many_tags"

@@ -263,6 +263,24 @@ class ProductTemplateAttributeLine(models.Model):
     """
     _inherit = "product.template.attribute.line"
 
+    @api.onchange("attribute_id")
+    def _onchange_attribute_id(self):
+        """From the Tag tab, an attribute starts with no values: the person picks one.
+
+        Odoo fills in EVERY value of an attribute that does not create variants the moment
+        it is chosen (core `_onchange_attribute_id`). On the template's own attributes tab
+        that is a sensible default; on the Tag tab it is the opposite of what the person is
+        doing, which is typing the one value of the piece in hand. Checked on production
+        2026-09-12: picking Case Diameter to load "41mm" saved the watch with every
+        diameter in the catalogue, and the tag reads from those lines.
+
+        Only the Tag tab passes `yag_tag_tab`; everywhere else the core behaviour stays.
+        """
+        if not self.env.context.get("yag_tag_tab"):
+            return super()._onchange_attribute_id()
+        self.value_ids = self.value_ids.filtered(
+            lambda pav: pav.attribute_id == self.attribute_id)
+
     @api.model
     def _yag_capturar(self, tmpl_ids):
         """The pieces at risk on these templates, before touching anything.
